@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "803247449375",
+    "project_id": "geopontopro",
+    "storage_bucket": "geopontopro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:803247449375:android:b90090e956138917463c2a",
+        "android_client_info": {
+          "package_name": "com.example.geoponto"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJq9U49QX1xOg31bHWA1GtBq22rmFD-Jo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
