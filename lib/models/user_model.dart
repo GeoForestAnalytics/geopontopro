@@ -1,44 +1,43 @@
-// lib/models/user_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../core/enums.dart'; // ISSO CORRIGE O ERRO DE URI E UNDEFINED CLASS
 
 class UserModel {
   final String uid;
   final String nome;
   final String email;
+  final String cargo;
   final String empresa;
-  final UserRole cargo;
-  final String cpf;
+  final bool isAdmin;
+  final DateTime criadoEm;
 
   UserModel({
     required this.uid,
     required this.nome,
     required this.email,
-    required this.empresa,
     required this.cargo,
-    required this.cpf,
+    required this.empresa,
+    required this.isAdmin,
+    required this.criadoEm,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    final data = doc.data() as Map<String, dynamic>;
     return UserModel(
       uid: doc.id,
       nome: data['nome'] ?? '',
       email: data['email'] ?? '',
+      cargo: data['cargo'] ?? '',
       empresa: data['empresa'] ?? '',
-      // Comparação segura de string para Enum
-      cargo: data['cargo'] == 'gerente' ? UserRole.gerente : UserRole.colaborador,
-      cpf: data['cpf'] ?? '',
+      isAdmin: data['isAdmin'] ?? false,
+      criadoEm: (data['criadoEm'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toFirestore() {
-    return {
-      'nome': nome,
-      'email': email,
-      'empresa': empresa,
-      'cargo': cargo.name, // Salva como string 'gerente' ou 'colaborador'
-      'cpf': cpf,
-    };
-  }
+  Map<String, dynamic> toMap() => {
+    'nome': nome,
+    'email': email,
+    'cargo': cargo,
+    'empresa': empresa,
+    'isAdmin': isAdmin,
+    'criadoEm': Timestamp.fromDate(criadoEm),
+  };
 }

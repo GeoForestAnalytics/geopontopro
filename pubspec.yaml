@@ -1,47 +1,61 @@
-name: geoponto
-description: "Sistema Profissional de Ponto Digital Georreferenciado"
-publish_to: 'none' 
-
-version: 1.0.0+1
+name: geoponto_pro
+description: "App de registro de ponto com geolocalização, assinatura digital e notificações"
+publish_to: 'none'
+version: 1.1.0+2
 
 environment:
-  sdk: '>=3.10.1 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  flutter_localizations: # Agora alinhado corretamente
+  flutter_localizations:
     sdk: flutter
-
   cupertino_icons: ^1.0.8
 
   # --- FIREBASE ---
-  firebase_core: ^3.0.0
-  firebase_auth: ^5.0.0
-  cloud_firestore: ^5.0.0
+  firebase_core: ^3.1.0
+  firebase_auth: ^5.1.0
+  cloud_firestore: ^5.1.0
+  firebase_messaging: ^15.2.0       # Notificações Push
 
-  # --- GEOLOCALIZAÇÃO ---
-  geolocator: ^11.0.0
-  latlong2: ^0.9.1 
-
-  # --- MAPAS ---
-  flutter_map: ^6.1.0
-
-  # --- OFFLINE E ARQUIVOS ---
-  sqflite: ^2.3.0
-  path: ^1.9.0
-
-  # --- UTILITÁRIOS ---
-  intl: ^0.20.2 # Versão atualizada para bater com o seu Flutter
-  device_info_plus: ^10.1.0
-
-  # --- ESTADO ---
+  # --- GERENCIAMENTO DE ESTADO ---
   flutter_riverpod: ^2.5.1
+
+  # --- GEOLOCALIZAÇÃO E MAPAS ---
+  geolocator: ^12.0.0
+  geocoding: ^3.0.0
+  flutter_map: ^7.0.2               # Versão mais atual e estável
+  latlong2: ^0.9.1
+
+  # --- NOTIFICAÇÕES LOCAIS E AGENDAMENTO ---
+  flutter_local_notifications: ^17.1.2
+  timezone: ^0.9.4
+
+  # --- PDF E IMPRESSÃO ---
+  pdf: ^3.11.0
+  printing: ^5.12.0
+  path_provider: ^2.1.3
+
+  # --- BANCO DE DADOS LOCAL E PREFERÊNCIAS ---
+  sqflite: ^2.3.3+1
+  shared_preferences: ^2.3.0
+
+  # --- UTILITÁRIOS E UI ---
+  signature: ^5.4.0                 # Assinatura digital
+  intl: ^0.20.2                     # Internacionalização (datas/moedas)
+  uuid: ^4.4.0                      # Gerador de IDs únicos
+  permission_handler: ^11.3.1       # Controle de permissões de GPS/Notif
+  device_info_plus: ^10.1.0         # Identificação do aparelho
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
+  
+  # Certifique-se de que a pasta assets/images realmente existe no seu projeto
+  assets:
+    - assets/images/

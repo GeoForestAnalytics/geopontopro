@@ -1,200 +1,167 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Importação do Firebase Auth
-import 'package:cloud_firestore/cloud_firestore.dart'; // Importação do Firestore
-import 'home_page.dart'; 
-import 'admin_dashboard.dart'; 
-import 'registro_empresa_page.dart'; 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_provider.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
-
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _estaCarregando = false;
-
-  Future<void> _fazerLogin() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _mostrarErro("Por favor, preencha e-mail e senha.");
-      return;
-    }
-
-    setState(() => _estaCarregando = true);
-
-    try {
-      // 1. AUTENTICAÇÃO NO FIREBASE AUTH
-      final UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      final User? user = userCredential.user;
-
-      if (user != null) {
-        // 2. BUSCA O CARGO E EMPRESA NO FIRESTORE (Substitui os Metadados do Supabase)
-        final DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('usuarios')
-            .doc(user.uid)
-            .get();
-
-        if (!mounted) return;
-
-        if (userDoc.exists) {
-          final dados = userDoc.data() as Map<String, dynamic>;
-          final String cargo = dados['cargo'] ?? 'colaborador';
-          final String empresa = dados['empresa'] ?? 'Geo Forest';
-
-          debugPrint("LOGIN SUCESSO: ${user.email} | Cargo: $cargo | Empresa: $empresa");
-
-          // 3. DIRECIONAMENTO DINÂMICO
-          if (cargo == 'gerente') {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const AdminDashboard()),
-              (route) => false,
-            );
-          } else {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const HomePage()),
-              (route) => false,
-            );
-          }
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Bem-vindo ao GeoPonto!'), backgroundColor: Colors.green),
-          );
-        } else {
-          // Caso o usuário exista no Auth mas não no banco (erro de integridade)
-          await FirebaseAuth.instance.signOut();
-          _mostrarErro("Erro: Perfil não encontrado. Contate o administrador.");
-        }
-      }
-    } on FirebaseAuthException catch (e) {
-      // Tratamento de erros específicos do Firebase
-      String mensagem = "Erro ao entrar.";
-      if (e.code == 'user-not-found') mensagem = "E-mail não cadastrado.";
-      if (e.code == 'wrong-password') mensagem = "Senha incorreta.";
-      if (e.code == 'invalid-email') mensagem = "E-mail inválido.";
-      if (e.code == 'user-disabled') mensagem = "Este usuário foi desativado.";
-      
-      _mostrarErro(mensagem);
-    } catch (e) {
-      _mostrarErro("Ocorreu um erro inesperado: $e");
-    } finally {
-      if (mounted) setState(() => _estaCarregando = false);
-    }
-  }
-
-  void _mostrarErro(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg), 
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+class _LoginPageState extends ConsumerState<LoginPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _senhaCtrl = TextEditingController();
+  bool _loading = false;
+  bool _senhaVisivel = false;
+  String? _erro;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _emailCtrl.dispose();
+    _senhaCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() { _loading = true; _erro = null; });
+    try {
+      await ref.read(authServiceProvider).login(_emailCtrl.text.trim(), _senhaCtrl.text);
+    } catch (e) {
+      setState(() => _erro = 'Email ou senha incorretos.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Mantive exatamente a mesma interface visual (UI) que você gosta
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.location_on, size: 60, color: Colors.green[700]),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Geo Ponto Pro', 
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.green[900])
-              ),
-              const SizedBox(height: 8),
-              const Text('Acesse sua conta para registrar o ponto', style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 40),
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  labelText: 'E-mail', 
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.email_outlined),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Senha', 
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.lock_outline),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: _estaCarregando ? null : _fazerLogin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[700], 
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 2,
-                  ),
-                  child: _estaCarregando 
-                      ? const CircularProgressIndicator(color: Colors.white) 
-                      : const Text('ENTRAR', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegistroEmpresaPage())),
-                child: Text.rich(
-                  TextSpan(
-                    text: 'Sua empresa não tem conta? ',
-                    style: const TextStyle(color: Colors.grey),
-                    children: [
-                      TextSpan(
-                        text: 'Cadastre-se',
-                        style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold),
+      backgroundColor: const Color(0xFF15803D),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Expanded(
+              flex: 2,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 80, height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                    ],
+                      child: const Icon(Icons.location_on, size: 44, color: Colors.white),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('GeoPonto Pro',
+                        style: TextStyle(color: Colors.white, fontSize: 32,
+                            fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+                    const SizedBox(height: 6),
+                    Text('Registro de ponto inteligente',
+                        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 15)),
+                  ],
+                ),
+              ),
+            ),
+
+            // Card de login
+            Expanded(
+              flex: 3,
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(28),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 8),
+                        const Text('Entrar', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text('Acesse sua conta para registrar o ponto',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                        const SizedBox(height: 28),
+
+                        TextFormField(
+                          controller: _emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: _inputDeco('Email', Icons.email_outlined),
+                          validator: (v) => v!.contains('@') ? null : 'Email inválido',
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _senhaCtrl,
+                          obscureText: !_senhaVisivel,
+                          decoration: _inputDeco('Senha', Icons.lock_outline).copyWith(
+                            suffixIcon: IconButton(
+                              icon: Icon(_senhaVisivel ? Icons.visibility_off : Icons.visibility),
+                              onPressed: () => setState(() => _senhaVisivel = !_senhaVisivel),
+                            ),
+                          ),
+                          validator: (v) => v!.length >= 6 ? null : 'Mínimo 6 caracteres',
+                        ),
+
+                        if (_erro != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red[50],
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.red[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline, color: Colors.red[700], size: 18),
+                                const SizedBox(width: 8),
+                                Text(_erro!, style: TextStyle(color: Colors.red[700], fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _loading ? null : _login,
+                            child: _loading
+                                ? const SizedBox(height: 20, width: 20,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : const Text('Entrar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
+
+  InputDecoration _inputDeco(String label, IconData icon) => InputDecoration(
+    labelText: label,
+    prefixIcon: Icon(icon, color: const Color(0xFF15803D)),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFF15803D), width: 2),
+    ),
+    filled: true,
+    fillColor: Colors.grey[50],
+  );
 }
