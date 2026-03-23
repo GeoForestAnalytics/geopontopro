@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
+import 'cadastro_page.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -27,7 +28,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _erro = null; });
     try {
-      await ref.read(authServiceProvider).login(_emailCtrl.text.trim(), _senhaCtrl.text);
+      await ref.read(authServiceProvider).login(
+        _emailCtrl.text.trim(), _senhaCtrl.text,
+      );
     } catch (e) {
       setState(() => _erro = 'Email ou senha incorretos.');
     } finally {
@@ -42,7 +45,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // ── Header ──────────────────────────────────────────────
             Expanded(
               flex: 2,
               child: Center(
@@ -69,7 +72,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               ),
             ),
 
-            // Card de login
+            // ── Card de login ────────────────────────────────────────
             Expanded(
               flex: 3,
               child: Container(
@@ -86,12 +89,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 8),
-                        const Text('Entrar', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                        const Text('Entrar',
+                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         Text('Acesse sua conta para registrar o ponto',
                             style: TextStyle(color: Colors.grey[600], fontSize: 14)),
                         const SizedBox(height: 28),
 
+                        // Email
                         TextFormField(
                           controller: _emailCtrl,
                           keyboardType: TextInputType.emailAddress,
@@ -99,18 +104,25 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           validator: (v) => v!.contains('@') ? null : 'Email inválido',
                         ),
                         const SizedBox(height: 16),
+
+                        // Senha
                         TextFormField(
                           controller: _senhaCtrl,
                           obscureText: !_senhaVisivel,
                           decoration: _inputDeco('Senha', Icons.lock_outline).copyWith(
                             suffixIcon: IconButton(
-                              icon: Icon(_senhaVisivel ? Icons.visibility_off : Icons.visibility),
-                              onPressed: () => setState(() => _senhaVisivel = !_senhaVisivel),
+                              icon: Icon(_senhaVisivel
+                                  ? Icons.visibility_off
+                                  : Icons.visibility),
+                              onPressed: () =>
+                                  setState(() => _senhaVisivel = !_senhaVisivel),
                             ),
                           ),
-                          validator: (v) => v!.length >= 6 ? null : 'Mínimo 6 caracteres',
+                          validator: (v) =>
+                              v!.length >= 6 ? null : 'Mínimo 6 caracteres',
                         ),
 
+                        // Mensagem de erro
                         if (_erro != null) ...[
                           const SizedBox(height: 12),
                           Container(
@@ -122,23 +134,76 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.error_outline, color: Colors.red[700], size: 18),
+                                Icon(Icons.error_outline,
+                                    color: Colors.red[700], size: 18),
                                 const SizedBox(width: 8),
-                                Text(_erro!, style: TextStyle(color: Colors.red[700], fontSize: 13)),
+                                Text(_erro!,
+                                    style: TextStyle(
+                                        color: Colors.red[700], fontSize: 13)),
                               ],
                             ),
                           ),
                         ],
 
                         const SizedBox(height: 24),
+
+                        // Botão Entrar
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: _loading ? null : _login,
                             child: _loading
-                                ? const SizedBox(height: 20, width: 20,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Text('Entrar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                ? const SizedBox(
+                                    height: 20, width: 20,
+                                    child: CircularProgressIndicator(
+                                        color: Colors.white, strokeWidth: 2))
+                                : const Text('Entrar',
+                                    style: TextStyle(
+                                        fontSize: 16, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Divisor
+                        Row(
+                          children: [
+                            Expanded(child: Divider(color: Colors.grey[300])),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text('ou',
+                                  style: TextStyle(
+                                      color: Colors.grey[500], fontSize: 13)),
+                            ),
+                            Expanded(child: Divider(color: Colors.grey[300])),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Botão Criar conta
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const CadastroPage()),
+                            ),
+                            icon: const Icon(Icons.person_add_outlined,
+                                color: Color(0xFF15803D)),
+                            label: const Text('Criar conta',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF15803D))),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: const BorderSide(
+                                  color: Color(0xFF15803D), width: 1.5),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
                           ),
                         ),
                       ],
@@ -154,14 +219,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   InputDecoration _inputDeco(String label, IconData icon) => InputDecoration(
-    labelText: label,
-    prefixIcon: Icon(icon, color: const Color(0xFF15803D)),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: Color(0xFF15803D), width: 2),
-    ),
-    filled: true,
-    fillColor: Colors.grey[50],
-  );
+        labelText: label,
+        prefixIcon: Icon(icon, color: const Color(0xFF15803D)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF15803D), width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.grey[50],
+      );
 }

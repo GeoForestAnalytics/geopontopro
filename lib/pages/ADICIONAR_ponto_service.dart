@@ -72,6 +72,7 @@ class PontoService {
       offline: offline,
     );
 
+    // Salva na coleção 'pontos' (conforme as regras do banco)
     await _db
         .collection('pontos')
         .doc(ponto.id)
@@ -115,7 +116,7 @@ class PontoService {
     return query.docs.map(PontoModel.fromFirestore).toList();
   }
 
-  // ─── Stream pontos hoje (tempo real) ────────────────────────────────────
+  // ─── Stream pontos hoje (tempo real para o Colaborador) ───────────────────
 
   Stream<List<PontoModel>> streamPontosHoje(String usuarioId) {
     final hoje = DateTime.now();
@@ -132,7 +133,7 @@ class PontoService {
         .map((s) => s.docs.map(PontoModel.fromFirestore).toList());
   }
 
-  // ─── Stream todos os funcionários hoje (admin) ────────────────────────────
+  // ─── Stream todos os funcionários hoje (tempo real para o Admin) ──────────
 
   Stream<List<PontoModel>> streamTodosPontosHoje() {
     final hoje = DateTime.now();
@@ -191,17 +192,8 @@ class PontoService {
         .set(fechamento.toMap());
   }
 
-  // ─── TODOS OS USUÁRIOS (GERENTES + COLABORADORES) ─────────────────────────
-  // MÉTODO SOLICITADO PARA RESOLVER O ERRO DA ADMIN_FUNCIONARIOS_PAGE
-  Stream<List<Map<String, dynamic>>> streamTodosUsuarios() {
-    return _db
-        .collection('usuarios')
-        .orderBy('isAdmin', descending: true) // Gerentes primeiro
-        .snapshots()
-        .map((s) => s.docs.map((d) => {...d.data(), 'uid': d.id}).toList());
-  }
+  // ─── Stream de Funcionários (Apenas Colaboradores) ───────────────────────
 
-  // ─── APENAS FUNCIONÁRIOS (COLABORADORES) ──────────────────────────────────
   Stream<List<Map<String, dynamic>>> streamFuncionarios() {
     return _db
         .collection('usuarios')
@@ -209,6 +201,17 @@ class PontoService {
         .snapshots()
         .map((s) => s.docs.map((d) => {...d.data(), 'uid': d.id}).toList());
   }
+
+  // ─── Stream de todos os usuários (Gerentes + Colaboradores) ───────────────
+
+  Stream<List<Map<String, dynamic>>> streamTodosUsuarios() {
+    return _db
+        .collection('usuarios')
+        .orderBy('isAdmin', descending: true) // Gerentes aparecem primeiro
+        .snapshots()
+        .map((s) => s.docs.map((d) => {...d.data(), 'uid': d.id}).toList());
+  }
 }
 
+// Provider do Riverpod para acessar o serviço em qualquer lugar
 final pontoServiceProvider = Provider((ref) => PontoService());

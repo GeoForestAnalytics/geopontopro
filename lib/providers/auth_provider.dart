@@ -10,40 +10,56 @@ final authStateProvider = StreamProvider<User?>((ref) {
 final userProfileProvider = FutureProvider<UserModel?>((ref) async {
   final auth = ref.watch(authStateProvider).value;
   if (auth == null) return null;
-  final doc = await FirebaseFirestore.instance.collection('usuarios').doc(auth.uid).get();
+  final doc = await FirebaseFirestore.instance
+      .collection('usuarios')
+      .doc(auth.uid)
+      .get();
   return doc.exists ? UserModel.fromFirestore(doc) : null;
 });
 
 class AuthService {
   final _auth = FirebaseAuth.instance;
-  final _db = FirebaseFirestore.instance;
+  final _db   = FirebaseFirestore.instance;
 
+  // ── Login ─────────────────────────────────────────────────────────────────
   Future<UserModel?> login(String email, String senha) async {
-    final cred = await _auth.signInWithEmailAndPassword(email: email, password: senha);
+    final cred = await _auth.signInWithEmailAndPassword(
+        email: email, password: senha);
     final doc = await _db.collection('usuarios').doc(cred.user!.uid).get();
     return doc.exists ? UserModel.fromFirestore(doc) : null;
   }
 
+  // ── Logout ────────────────────────────────────────────────────────────────
   Future<void> logout() => _auth.signOut();
 
-  Future<UserModel> criarFuncionario({
+  // ── Criar Usuário (Gerente ou Colaborador) ────────────────────────────────
+  // Este método substitui o 'primeiroOuCriarConta' e o 'criarFuncionario'
+  // sendo usado tanto pela tela de cadastro público quanto pelo admin.
+  Future<UserModel> criarUsuario({
     required String nome,
     required String email,
     required String senha,
     required String cargo,
     required String empresa,
+    required bool isGerente,
   }) async {
-    final cred = await _auth.createUserWithEmailAndPassword(email: email, password: senha);
+    // 1. Cria o login no Firebase Auth
+    final cred = await _auth.createUserWithEmailAndPassword(
+        email: email, password: senha);
+
     final user = UserModel(
-      uid: cred.user!.uid,
-      nome: nome,
-      email: email,
-      cargo: cargo,
-      empresa: empresa,
-      isAdmin: false,
+      uid:      cred.user!.uid,
+      nome:     nome,
+      email:    email,
+      cargo:    cargo,
+      empresa:  empresa,
+      isAdmin:  isGerente, // Se for cadastro público = true, se for admin criando equipe = o admin escolhe
       criadoEm: DateTime.now(),
     );
+
+    // 2. Salva os dados no Firestore
     await _db.collection('usuarios').doc(cred.user!.uid).set(user.toMap());
+    
     return user;
   }
 }
