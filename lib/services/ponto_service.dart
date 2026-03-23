@@ -192,7 +192,6 @@ class PontoService {
   }
 
   // ─── TODOS OS USUÁRIOS (GERENTES + COLABORADORES) ─────────────────────────
-  // MÉTODO SOLICITADO PARA RESOLVER O ERRO DA ADMIN_FUNCIONARIOS_PAGE
   Stream<List<Map<String, dynamic>>> streamTodosUsuarios() {
     return _db
         .collection('usuarios')
