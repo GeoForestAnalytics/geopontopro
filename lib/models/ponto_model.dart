@@ -5,28 +5,26 @@ enum TipoBatida { entrada, saidaAlmoco, retornoAlmoco, saida }
 extension TipoBatidaExt on TipoBatida {
   String get label {
     switch (this) {
-      case TipoBatida.entrada:        return 'Entrada';
-      case TipoBatida.saidaAlmoco:    return 'Saída Almoço';
-      case TipoBatida.retornoAlmoco:  return 'Retorno Almoço';
-      case TipoBatida.saida:          return 'Saída';
+      case TipoBatida.entrada: return 'Entrada';
+      case TipoBatida.saidaAlmoco: return 'Saída Almoço';
+      case TipoBatida.retornoAlmoco: return 'Retorno Almoço';
+      case TipoBatida.saida: return 'Saída';
     }
   }
-
   String get value {
     switch (this) {
-      case TipoBatida.entrada:        return 'entrada';
-      case TipoBatida.saidaAlmoco:    return 'saida_almoco';
-      case TipoBatida.retornoAlmoco:  return 'retorno_almoco';
-      case TipoBatida.saida:          return 'saida';
+      case TipoBatida.entrada: return 'entrada';
+      case TipoBatida.saidaAlmoco: return 'saida_almoco';
+      case TipoBatida.retornoAlmoco: return 'retorno_almoco';
+      case TipoBatida.saida: return 'saida';
     }
   }
-
   static TipoBatida fromString(String v) {
     switch (v) {
-      case 'entrada':         return TipoBatida.entrada;
-      case 'saida_almoco':    return TipoBatida.saidaAlmoco;
-      case 'retorno_almoco':  return TipoBatida.retornoAlmoco;
-      default:                return TipoBatida.saida;
+      case 'entrada': return TipoBatida.entrada;
+      case 'saida_almoco': return TipoBatida.saidaAlmoco;
+      case 'retorno_almoco': return TipoBatida.retornoAlmoco;
+      default: return TipoBatida.saida;
     }
   }
 }
@@ -35,6 +33,7 @@ class PontoModel {
   final String id;
   final String usuarioId;
   final String usuarioNome;
+  final String empresa; // <--- ADICIONADO
   final TipoBatida tipo;
   final DateTime timestamp;
   final double latitude;
@@ -46,6 +45,7 @@ class PontoModel {
     required this.id,
     required this.usuarioId,
     required this.usuarioNome,
+    required this.empresa, // <--- ADICIONADO
     required this.tipo,
     required this.timestamp,
     required this.latitude,
@@ -60,6 +60,7 @@ class PontoModel {
       id: doc.id,
       usuarioId: d['usuarioId'] ?? '',
       usuarioNome: d['usuarioNome'] ?? '',
+      empresa: d['empresa'] ?? '', // <--- ADICIONADO
       tipo: TipoBatidaExt.fromString(d['tipo'] ?? 'entrada'),
       timestamp: (d['timestamp'] as Timestamp).toDate(),
       latitude: (d['latitude'] ?? 0.0).toDouble(),
@@ -72,6 +73,7 @@ class PontoModel {
   Map<String, dynamic> toMap() => {
     'usuarioId': usuarioId,
     'usuarioNome': usuarioNome,
+    'empresa': empresa, // <--- ADICIONADO
     'tipo': tipo.value,
     'timestamp': Timestamp.fromDate(timestamp),
     'latitude': latitude,
@@ -87,7 +89,6 @@ class FechamentoMensal {
   final String usuarioNome;
   final int mes;
   final int ano;
-  final List<PontoModel> pontos;
   final String? assinaturaBase64;
   final DateTime? assinadoEm;
   final bool fechado;
@@ -98,7 +99,6 @@ class FechamentoMensal {
     required this.usuarioNome,
     required this.mes,
     required this.ano,
-    required this.pontos,
     this.assinaturaBase64,
     this.assinadoEm,
     required this.fechado,
@@ -111,8 +111,7 @@ class FechamentoMensal {
       usuarioId: d['usuarioId'] ?? '',
       usuarioNome: d['usuarioNome'] ?? '',
       mes: d['mes'] ?? 1,
-      ano: d['ano'] ?? DateTime.now().year,
-      pontos: [],
+      ano: d['ano'] ?? 2024,
       assinaturaBase64: d['assinaturaBase64'],
       assinadoEm: (d['assinadoEm'] as Timestamp?)?.toDate(),
       fechado: d['fechado'] ?? false,

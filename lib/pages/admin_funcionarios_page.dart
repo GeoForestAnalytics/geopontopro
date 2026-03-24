@@ -10,13 +10,13 @@ class AdminFuncionariosPage extends ConsumerStatefulWidget {
 }
 
 class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
-  bool _criando = false;
-  final _formKey = GlobalKey<FormState>();
+  // Controladores agora ficam aqui
   final _nomeCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _senhaCtrl = TextEditingController();
   final _cargoCtrl = TextEditingController();
   bool _novoEhGerente = false;
+  bool _criando = false;
   String? _erro;
 
   @override
@@ -28,28 +28,34 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
     super.dispose();
   }
 
-  // Lógica para criar usuário passando a empresa do Admin logado
   Future<void> _criarUsuario(String empresaAdmin) async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_nomeCtrl.text.isEmpty || _emailCtrl.text.isEmpty || _senhaCtrl.text.length < 6) {
+      setState(() => _erro = "Preencha todos os campos corretamente.");
+      return;
+    }
+
     setState(() { _criando = true; _erro = null; });
+    
     try {
       await ref.read(authServiceProvider).criarUsuario(
         nome: _nomeCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         senha: _senhaCtrl.text,
         cargo: _cargoCtrl.text.trim(),
-        empresa: empresaAdmin, // Vincula automaticamente à mesma empresa
+        empresa: empresaAdmin,
         isGerente: _novoEhGerente,
       );
+
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context); // Fecha o modal primeiro
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Usuário criado com sucesso!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Colaborador criado!'), backgroundColor: Colors.green)
         );
+        // Limpa os campos DEPOIS de fechar o modal, verificando se ainda existe
         _nomeCtrl.clear(); _emailCtrl.clear(); _senhaCtrl.clear(); _cargoCtrl.clear();
       }
     } catch (e) {
-      setState(() => _erro = "Erro: E-mail já existe ou senha fraca.");
+      if (mounted) setState(() => _erro = "Erro ao criar: E-mail já existe ou falha na rede.");
     } finally {
       if (mounted) setState(() => _criando = false);
     }
@@ -57,90 +63,62 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Pegamos o perfil do Admin logado para saber a empresa dele
-    final profileAsync = ref.watch(userProfileProvider);
+    final admin = ref.watch(userProfileProvider).value;
+    if (admin == null) return const Center(child: CircularProgressIndicator());
 
-    return profileAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Erro ao carregar perfil: $e')),
-      data: (admin) {
-        if (admin == null) return const Center(child: Text('Admin não encontrado'));
+    return Scaffold(
+      backgroundColor: const Color(0xFFF0FDF4),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: PontoService().streamTodosUsuarios(admin.empresa),
+        builder: (context, snapshot) {
+          final lista = snapshot.data ?? [];
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF0FDF4),
-          body: StreamBuilder<List<Map<String, dynamic>>>(
-            // CORREÇÃO DO ERRO: Passamos admin.empresa como argumento
-            stream: PontoService().streamTodosUsuarios(admin.empresa),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final lista = snapshot.data ?? [];
-
-              return CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${lista.length} Colaboradores', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                              Text(admin.empresa, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                            ],
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () => _abrirModal(admin.empresa),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Novo'),
-                          ),
-                        ],
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('${lista.length} Membros na Equipe', 
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ElevatedButton.icon(
+                        onPressed: () => _abrirModal(admin.empresa), 
+                        icon: const Icon(Icons.add), label: const Text('Novo')
                       ),
-                    ),
+                    ],
                   ),
-                  lista.isEmpty
-                      ? const SliverFillRemaining(child: Center(child: Text('Nenhum funcionário cadastrado.')))
-                      : SliverPadding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (ctx, i) {
-                                final u = lista[i];
-                                final bool isGer = u['isAdmin'] == true;
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: isGer ? Colors.purple[50] : Colors.blue[50],
-                                      child: Icon(isGer ? Icons.admin_panel_settings : Icons.person, color: isGer ? Colors.purple : Colors.blue),
-                                    ),
-                                    title: Text(u['nome'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    subtitle: Text(u['cargo']),
-                                    trailing: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: isGer ? Colors.purple[100] : Colors.blue[100],
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(isGer ? 'GERENTE' : 'COLABORADOR', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: isGer ? Colors.purple[900] : Colors.blue[900])),
-                                    ),
-                                  ),
-                                );
-                              },
-                              childCount: lista.length,
-                            ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) {
+                      final u = lista[i];
+                      final isGerente = u['isAdmin'] == true;
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: isGerente ? Colors.purple[50] : Colors.blue[50],
+                            child: Icon(isGerente ? Icons.admin_panel_settings : Icons.person, 
+                                 color: isGerente ? Colors.purple : Colors.blue),
                           ),
+                          title: Text(u['nome'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(u['cargo']),
                         ),
-                ],
-              );
-            },
-          ),
-        );
-      },
+                      );
+                    },
+                    childCount: lista.length,
+                  ),
+                ),
+              )
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -149,62 +127,57 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) => StatefulBuilder(
-        builder: (ctx, setModal) => Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 24, left: 24, right: 24, top: 24),
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      builder: (ctx) => StatefulBuilder( // Necessário para atualizar o Switch de Gerente dentro do modal
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            left: 24, right: 24, top: 24
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Novo Colaborador', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              
+              // Seleção de Perfil
+              Row(
                 children: [
-                  const Text('Cadastrar na Equipe', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
-                  // Seletor de Perfil
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _perfilCard(
-                          selecionado: !_novoEhGerente,
-                          titulo: 'Colaborador',
-                          icone: Icons.person,
-                          cor: Colors.blue,
-                          onTap: () => setModal(() => _novoEhGerente = false),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _perfilCard(
-                          selecionado: _novoEhGerente,
-                          titulo: 'Gerente',
-                          icone: Icons.admin_panel_settings,
-                          cor: Colors.purple,
-                          onTap: () => setModal(() => _novoEhGerente = true),
-                        ),
-                      ),
-                    ],
+                  Expanded(
+                    child: _perfilCard(
+                      selecionado: !_novoEhGerente, 
+                      titulo: 'Colaborador', icone: Icons.person, cor: Colors.blue,
+                      onTap: () { setModalState(() => _novoEhGerente = false); setState(() => _novoEhGerente = false); }
+                    ),
                   ),
-                  const SizedBox(height: 20),
-                  _campo(_nomeCtrl, 'Nome Completo', Icons.badge_outlined),
-                  const SizedBox(height: 12),
-                  _campo(_emailCtrl, 'E-mail de Acesso', Icons.email_outlined, keyboard: TextInputType.emailAddress),
-                  const SizedBox(height: 12),
-                  _campo(_senhaCtrl, 'Senha Temporária', Icons.lock_outline, obscure: true),
-                  const SizedBox(height: 12),
-                  _campo(_cargoCtrl, 'Cargo/Função', Icons.work_outline),
-                  if (_erro != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_erro!, style: const TextStyle(color: Colors.red, fontSize: 12))),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _criando ? null : () => _criarUsuario(empresaAdmin),
-                      child: _criando ? const CircularProgressIndicator(color: Colors.white) : const Text('CONCLUIR CADASTRO'),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _perfilCard(
+                      selecionado: _novoEhGerente, 
+                      titulo: 'Gerente', icone: Icons.admin_panel_settings, cor: Colors.purple,
+                      onTap: () { setModalState(() => _novoEhGerente = true); setState(() => _novoEhGerente = true); }
                     ),
                   ),
                 ],
               ),
-            ),
+              
+              const SizedBox(height: 20),
+              TextField(controller: _nomeCtrl, decoration: const InputDecoration(labelText: 'Nome Completo')),
+              TextField(controller: _emailCtrl, decoration: const InputDecoration(labelText: 'E-mail')),
+              TextField(controller: _senhaCtrl, decoration: const InputDecoration(labelText: 'Senha (mín. 6 chars)')),
+              TextField(controller: _cargoCtrl, decoration: const InputDecoration(labelText: 'Cargo')),
+              
+              if (_erro != null) Padding(padding: const EdgeInsets.all(8.0), child: Text(_erro!, style: const TextStyle(color: Colors.red))),
+              
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _criando ? null : () => _criarUsuario(empresaAdmin),
+                  child: _criando ? const CircularProgressIndicator() : const Text('CRIAR ACESSO'),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -224,27 +197,10 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
         child: Column(
           children: [
             Icon(icone, color: selecionado ? cor : Colors.grey),
-            const SizedBox(height: 4),
-            Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, color: selecionado ? cor : Colors.grey, fontSize: 12)),
+            Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, color: selecionado ? cor : Colors.grey)),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _campo(TextEditingController ctrl, String label, IconData icon, {bool obscure = false, TextInputType keyboard = TextInputType.text}) {
-    return TextFormField(
-      controller: ctrl,
-      obscureText: obscure,
-      keyboardType: keyboard,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, size: 20),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        filled: true,
-        fillColor: Colors.grey[50],
-      ),
-      validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
     );
   }
 }

@@ -23,6 +23,30 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   bool _registrando = false;
 
+  // ─── LÓGICA DO BOTÃO INTELIGENTE ──────────────────────────────────────────
+  // Decide qual batida deve ser feita agora com base no que já foi batido hoje
+  TipoBatida _descobrirProximaBatida(List<PontoModel> pontos) {
+    if (pontos.isEmpty) return TipoBatida.entrada;
+    
+    // Como os pontos vem ordenados por timestamp (do mais antigo para o novo no stream)
+    // nós contamos quantos registros existem hoje.
+    if (pontos.length == 1) return TipoBatida.saidaAlmoco;
+    if (pontos.length == 2) return TipoBatida.retornoAlmoco;
+    if (pontos.length == 3) return TipoBatida.saida;
+    
+    return TipoBatida.saida; // Caso tenha mais de 4, continua como saída por segurança
+  }
+
+  // ─── CORES DINÂMICAS PARA O BOTÃO ─────────────────────────────────────────
+  Color _corBotao(TipoBatida tipo) {
+    switch (tipo) {
+      case TipoBatida.entrada: return const Color(0xFF15803D); // Verde
+      case TipoBatida.saidaAlmoco: return const Color(0xFFF59E0B); // Laranja
+      case TipoBatida.retornoAlmoco: return const Color(0xFF3B82F6); // Azul
+      case TipoBatida.saida: return const Color(0xFFEF4444); // Vermelho
+    }
+  }
+
   void _mostrarErroGPS(String erro) {
     showDialog(
       context: context,
@@ -89,17 +113,16 @@ class _HomePageState extends ConsumerState<HomePage> {
           appBar: AppBar(
             title: const Text('GeoPonto Pro', style: TextStyle(fontWeight: FontWeight.bold)),
             actions: [
-              IconButton(
-                onPressed: () => ref.read(authServiceProvider).logout(), 
-                icon: const Icon(Icons.logout)
-              )
+              IconButton(onPressed: () => ref.read(authServiceProvider).logout(), icon: const Icon(Icons.logout))
             ],
           ),
           body: StreamBuilder<List<PontoModel>>(
+            // Usamos o stream de pontos de hoje para alimentar o botão e a lista
             stream: ref.read(pontoServiceProvider).streamPontosHoje(user.uid),
             builder: (context, snapshot) {
               final pontos = snapshot.data ?? [];
-              final proxima = _proximaBatida(pontos);
+              // AQUI ESTÁ A MÁGICA: O botão descobre sozinho qual é o próximo passo
+              final proxima = _descobrirProximaBatida(pontos);
               final now = DateTime.now();
 
               return SingleChildScrollView(
@@ -107,16 +130,21 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildRelogioCard(user, now),
+                    // 1. RELÓGIO EM TEMPO REAL (Não trava mais)
+                    _buildRelogioVivo(user),
                     const SizedBox(height: 20),
-                    _buildBotaoPonto(user, proxima, pontos.length),
+
+                    // 2. BOTÃO DINÂMICO
+                    _buildBotaoAcao(user, proxima, pontos.length),
                     const SizedBox(height: 25),
+
+                    // 3. LISTA DE REGISTROS DO DIA
                     const Text('Registros de Hoje', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
                     if (pontos.isEmpty)
-                      const Card(child: ListTile(title: Text('Nenhum registro hoje', style: TextStyle(color: Colors.grey, fontSize: 13))))
+                      const Card(child: ListTile(title: Text('Nenhum registro ainda', style: TextStyle(color: Colors.grey, fontSize: 13))))
                     else
-                      ...pontos.map((p) => _buildMiniCardPonto(p)),
+                      ...pontos.map((p) => _buildMiniCardPonto(p)).toList(),
 
                     const SizedBox(height: 25),
                     const Text('Menu de Opções', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -133,49 +161,65 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _buildRelogioCard(UserModel user, DateTime now) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF15803D), Color(0xFF16A34A)]),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(now), style: const TextStyle(color: Colors.white70)),
-          const SizedBox(height: 4),
-          Text(DateFormat('HH:mm:ss').format(now), style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold)),
-          Text('${user.nome} • ${user.empresa}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-        ],
-      ),
+  // ─── WIDGET: RELÓGIO QUE ATUALIZA SOZINHO ──────────────────────────────────
+  Widget _buildRelogioVivo(UserModel user) {
+    return StreamBuilder<DateTime>(
+      // Cria um timer que "pinga" a cada 1 segundo
+      stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
+      builder: (context, snapshot) {
+        final horaAtual = snapshot.data ?? DateTime.now();
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF15803D), Color(0xFF16A34A)]),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.2), blurRadius: 10)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(horaAtual), style: const TextStyle(color: Colors.white70)),
+              const SizedBox(height: 4),
+              Text(DateFormat('HH:mm:ss').format(horaAtual), style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold)),
+              Text('${user.nome} • ${user.empresa}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        );
+      }
     );
   }
 
-  Widget _buildBotaoPonto(UserModel user, TipoBatida proxima, int total) {
-    if (total >= 4) {
+  // ─── WIDGET: BOTÃO QUE MUDA DE COR E TEXTO ─────────────────────────────────
+  Widget _buildBotaoAcao(UserModel user, TipoBatida proxima, int totalHoje) {
+    if (totalHoje >= 4) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.green)),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 10), Text('Jornada concluída!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green))],
+          children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 10), Text('Jornada concluída hoje!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green))],
         ),
       );
     }
 
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: _corTipo(proxima),
-        minimumSize: const Size(double.infinity, 80),
+        backgroundColor: _corBotao(proxima), // Cor muda conforme a batida
+        minimumSize: const Size(double.infinity, 85),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 4,
       ),
       onPressed: _registrando ? null : () => _registrarPonto(user, proxima),
       child: _registrando 
         ? const CircularProgressIndicator(color: Colors.white)
-        : Text('REGISTRAR ${proxima.label.toUpperCase()}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        : Column(
+            children: [
+              Text('REGISTRAR ${proxima.label.toUpperCase()}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('Toque para validar GPS e horário', style: TextStyle(fontSize: 11, fontWeight: FontWeight.normal, color: Colors.white70)),
+            ],
+          ),
     );
   }
 
@@ -183,14 +227,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        // CORREÇÃO: Usamos 'side' em vez de 'border'
-        side: BorderSide(color: Colors.grey[200]!),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[200]!)),
       child: ListTile(
         dense: true,
-        leading: Icon(Icons.check_circle, color: _corTipo(p.tipo), size: 20),
+        leading: Icon(Icons.check_circle, color: _corBotao(p.tipo), size: 20),
         title: Text(p.tipo.label, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(p.endereco, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
         trailing: Text(DateFormat('HH:mm').format(p.timestamp), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -242,21 +282,5 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ),
     );
-  }
-
-  TipoBatida _proximaBatida(List<PontoModel> pontos) {
-    if (pontos.isEmpty) return TipoBatida.entrada;
-    if (pontos.length == 1) return TipoBatida.saidaAlmoco;
-    if (pontos.length == 2) return TipoBatida.retornoAlmoco;
-    return TipoBatida.saida;
-  }
-
-  Color _corTipo(TipoBatida tipo) {
-    switch (tipo) {
-      case TipoBatida.entrada: return const Color(0xFF15803D);
-      case TipoBatida.saidaAlmoco: return const Color(0xFFF59E0B);
-      case TipoBatida.retornoAlmoco: return const Color(0xFF3B82F6);
-      case TipoBatida.saida: return const Color(0xFFEF4444);
-    }
   }
 }
