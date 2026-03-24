@@ -123,9 +123,12 @@ class _AssinaturaPageState extends State<AssinaturaPage> {
       if (imgBytes == null) throw Exception('Erro ao exportar assinatura');
 
       final base64 = base64Encode(imgBytes);
+      
+      // CORREÇÃO: Adicionado o parâmetro 'empresa' que é obrigatório no PontoService
       await PontoService().salvarAssinatura(
         usuarioId: widget.user.uid,
         usuarioNome: widget.user.nome,
+        empresa: widget.user.empresa, // <--- Valor obtido do UserModel
         mes: _mes,
         ano: _ano,
         assinaturaBase64: base64,

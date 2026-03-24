@@ -9,26 +9,17 @@ class PontoService {
   final _db = FirebaseFirestore.instance;
   final _uuid = const Uuid();
 
-  // ─── Geolocalização ───────────────────────────────────────────────────────
-
+  // ─── GPS e Localização ───────────────────────────────────────────────────
   Future<Position> obterPosicao() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) throw Exception('Serviço de localização desativado.');
+    if (!serviceEnabled) throw 'GPS_DESLIGADO';
 
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception('Permissão de localização negada.');
-      }
+      if (permission == LocationPermission.denied) throw 'PERMISSAO_NEGADA';
     }
-    if (permission == LocationPermission.deniedForever) {
-      throw Exception('Permissão de localização negada permanentemente.');
-    }
-
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
+    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
   }
 
   Future<String> obterEndereco(double lat, double lng) async {
@@ -36,27 +27,28 @@ class PontoService {
       final placemarks = await placemarkFromCoordinates(lat, lng);
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
-        return '${p.street}, ${p.subLocality}, ${p.locality} - ${p.administrativeArea}';
+        return '${p.street}, ${p.subLocality}, ${p.locality}';
       }
     } catch (_) {}
-    return 'Lat: ${lat.toStringAsFixed(5)}, Lng: ${lng.toStringAsFixed(5)}';
+    return 'Lat: ${lat.toStringAsFixed(4)}, Lng: ${lng.toStringAsFixed(4)}';
   }
 
-  // ─── Registrar ponto ──────────────────────────────────────────────────────
-
+  // ─── Registro de Ponto ────────────────────────────────────────────────────
   Future<PontoModel> registrarPonto({
     required String usuarioId,
     required String usuarioNome,
+    required String empresa,
     required TipoBatida tipo,
-    bool offline = false,
   }) async {
-    Position? position;
+    Position? pos;
     String endereco = 'Localização indisponível';
+    bool offline = false;
 
     try {
-      position = await obterPosicao();
-      endereco = await obterEndereco(position.latitude, position.longitude);
+      pos = await obterPosicao();
+      endereco = await obterEndereco(pos.latitude, pos.longitude);
     } catch (e) {
+      if (e == 'GPS_DESLIGADO' || e == 'PERMISSAO_NEGADA') rethrow;
       offline = true;
     }
 
@@ -66,109 +58,75 @@ class PontoService {
       usuarioNome: usuarioNome,
       tipo: tipo,
       timestamp: DateTime.now(),
-      latitude: position?.latitude ?? 0.0,
-      longitude: position?.longitude ?? 0.0,
+      latitude: pos?.latitude ?? 0.0,
+      longitude: pos?.longitude ?? 0.0,
       endereco: endereco,
       offline: offline,
     );
 
-    await _db
-        .collection('pontos')
-        .doc(ponto.id)
-        .set(ponto.toMap());
+    final dados = ponto.toMap();
+    dados['empresa'] = empresa; // Filtro de segurança SaaS
 
+    await _db.collection('pontos').doc(ponto.id).set(dados);
     return ponto;
   }
 
-  // ─── Buscar pontos do dia ─────────────────────────────────────────────────
-
-  Future<List<PontoModel>> obterPontosHoje(String usuarioId) async {
-    final hoje = DateTime.now();
-    final inicio = DateTime(hoje.year, hoje.month, hoje.day);
-    final fim = inicio.add(const Duration(days: 1));
-
-    final query = await _db
-        .collection('pontos')
-        .where('usuarioId', isEqualTo: usuarioId)
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
-        .where('timestamp', isLessThan: Timestamp.fromDate(fim))
-        .orderBy('timestamp')
-        .get();
-
-    return query.docs.map(PontoModel.fromFirestore).toList();
-  }
-
-  // ─── Buscar pontos do mês ─────────────────────────────────────────────────
-
-  Future<List<PontoModel>> obterPontosMes(String usuarioId, int mes, int ano) async {
-    final inicio = DateTime(ano, mes, 1);
-    final fim = DateTime(ano, mes + 1, 1);
-
-    final query = await _db
-        .collection('pontos')
-        .where('usuarioId', isEqualTo: usuarioId)
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
-        .where('timestamp', isLessThan: Timestamp.fromDate(fim))
-        .orderBy('timestamp')
-        .get();
-
-    return query.docs.map(PontoModel.fromFirestore).toList();
-  }
-
-  // ─── Stream pontos hoje (tempo real) ────────────────────────────────────
-
+  // ─── Streams e Consultas (Com Filtro de Empresa) ──────────────────────────
   Stream<List<PontoModel>> streamPontosHoje(String usuarioId) {
-    final hoje = DateTime.now();
-    final inicio = DateTime(hoje.year, hoje.month, hoje.day);
-    final fim = inicio.add(const Duration(days: 1));
-
-    return _db
-        .collection('pontos')
+    final inicio = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    return _db.collection('pontos')
         .where('usuarioId', isEqualTo: usuarioId)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
-        .where('timestamp', isLessThan: Timestamp.fromDate(fim))
         .orderBy('timestamp')
         .snapshots()
         .map((s) => s.docs.map(PontoModel.fromFirestore).toList());
   }
 
-  // ─── Stream todos os funcionários hoje (admin) ────────────────────────────
-
-  Stream<List<PontoModel>> streamTodosPontosHoje() {
-    final hoje = DateTime.now();
-    final inicio = DateTime(hoje.year, hoje.month, hoje.day);
-    final fim = inicio.add(const Duration(days: 1));
-
-    return _db
-        .collection('pontos')
+  Stream<List<PontoModel>> streamTodosPontosHoje(String empresa) {
+    final inicio = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    return _db.collection('pontos')
+        .where('empresa', isEqualTo: empresa)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
-        .where('timestamp', isLessThan: Timestamp.fromDate(fim))
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((s) => s.docs.map(PontoModel.fromFirestore).toList());
   }
 
-  // ─── Fechamento mensal ────────────────────────────────────────────────────
+  Stream<List<Map<String, dynamic>>> streamTodosUsuarios(String empresa) {
+    return _db.collection('usuarios')
+        .where('empresa', isEqualTo: empresa)
+        .orderBy('isAdmin', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => {...d.data(), 'uid': d.id}).toList());
+  }
 
-  Future<bool> verificarFechamentoExistente(String usuarioId, int mes, int ano) async {
-    final doc = await _db
-        .collection('fechamentos')
-        .doc('${usuarioId}_${ano}_$mes')
+  Future<List<PontoModel>> obterPontosMes(String usuarioId, int mes, int ano) async {
+    final inicio = DateTime(ano, mes, 1);
+    final fim = DateTime(ano, mes + 1, 1);
+    final query = await _db.collection('pontos')
+        .where('usuarioId', isEqualTo: usuarioId)
+        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
+        .where('timestamp', isLessThan: Timestamp.fromDate(fim))
+        .orderBy('timestamp')
         .get();
-    return doc.exists && (doc.data()?['fechado'] ?? false);
+    return query.docs.map(PontoModel.fromFirestore).toList();
+  }
+
+  // ─── Assinaturas e Fechamento ─────────────────────────────────────────────
+  Future<bool> verificarFechamentoExistente(String usuarioId, int mes, int ano) async {
+    final doc = await _db.collection('fechamentos').doc('${usuarioId}_${ano}_$mes').get();
+    return doc.exists;
   }
 
   Future<FechamentoMensal?> obterFechamento(String usuarioId, int mes, int ano) async {
-    final doc = await _db
-        .collection('fechamentos')
-        .doc('${usuarioId}_${ano}_$mes')
-        .get();
+    final doc = await _db.collection('fechamentos').doc('${usuarioId}_${ano}_$mes').get();
     return doc.exists ? FechamentoMensal.fromFirestore(doc) : null;
   }
 
   Future<void> salvarAssinatura({
     required String usuarioId,
     required String usuarioNome,
+    required String empresa,
     required int mes,
     required int ano,
     required String assinaturaBase64,
@@ -184,29 +142,9 @@ class PontoService {
       assinadoEm: DateTime.now(),
       fechado: true,
     );
-
-    await _db
-        .collection('fechamentos')
-        .doc(fechamento.id)
-        .set(fechamento.toMap());
-  }
-
-  // ─── TODOS OS USUÁRIOS (GERENTES + COLABORADORES) ─────────────────────────
-  Stream<List<Map<String, dynamic>>> streamTodosUsuarios() {
-    return _db
-        .collection('usuarios')
-        .orderBy('isAdmin', descending: true) // Gerentes primeiro
-        .snapshots()
-        .map((s) => s.docs.map((d) => {...d.data(), 'uid': d.id}).toList());
-  }
-
-  // ─── APENAS FUNCIONÁRIOS (COLABORADORES) ──────────────────────────────────
-  Stream<List<Map<String, dynamic>>> streamFuncionarios() {
-    return _db
-        .collection('usuarios')
-        .where('isAdmin', isEqualTo: false)
-        .snapshots()
-        .map((s) => s.docs.map((d) => {...d.data(), 'uid': d.id}).toList());
+    final dados = fechamento.toMap();
+    dados['empresa'] = empresa;
+    await _db.collection('fechamentos').doc(fechamento.id).set(dados);
   }
 }
 
