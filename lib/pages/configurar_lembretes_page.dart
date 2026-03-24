@@ -1,14 +1,10 @@
 // ============================================================
-// pages/configurar_lembretes_page.dart
-// ============================================================
-// Adicione na HomePage um botão que navega para esta tela:
-//
-//   Navigator.push(context, MaterialPageRoute(
-//     builder: (_) => const ConfigurarLembretesPage()));
+// pages/configurar_lembretes_page.dart (ATUALIZADO)
 // ============================================================
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart'; // <--- OBRIGATÓRIO
 import '../services/notification_service.dart';
 
 class ConfigurarLembretesPage extends StatefulWidget {
@@ -51,8 +47,34 @@ class _ConfigurarLembretesPageState extends State<ConfigurarLembretesPage> {
   String _toString(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
+  // ─── LÓGICA DE SALVAMENTO COM PERMISSÕES ───────────────────────────────────
   Future<void> _salvar() async {
     setState(() => _salvando = true);
+
+    if (_ativo) {
+      // 1. Pedir permissão de Notificação (Essencial para Android 13+)
+      var statusNotif = await Permission.notification.status;
+      if (statusNotif.isDenied) {
+        statusNotif = await Permission.notification.request();
+      }
+
+      // 2. Pedir permissão de Alarme Exato (Essencial para Android 12+)
+      // Nota: scheduleExactAlarm é o que faz o lembrete tocar no segundo certo
+      var statusAlarme = await Permission.scheduleExactAlarm.status;
+      if (statusAlarme.isDenied) {
+        statusAlarme = await Permission.scheduleExactAlarm.request();
+      }
+
+      // Se o usuário negou as permissões, avisamos que pode não funcionar
+      if (statusNotif.isPermanentlyDenied || statusAlarme.isPermanentlyDenied) {
+        if (mounted) {
+          _mostrarAvisoPermissao();
+          setState(() => _salvando = false);
+          return;
+        }
+      }
+    }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('lembretes_ativo', _ativo);
     await prefs.setString('lembrete_entrada',        _toString(_entrada));
@@ -76,13 +98,35 @@ class _ConfigurarLembretesPageState extends State<ConfigurarLembretesPage> {
       setState(() => _salvando = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_ativo ? 'Lembretes ativados!' : 'Lembretes desativados.'),
+          content: Text(_ativo ? 'Lembretes configurados e ativos!' : 'Lembretes desativados.'),
           backgroundColor: const Color(0xFF15803D),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     }
+  }
+
+  void _mostrarAvisoPermissao() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Permissões Necessárias'),
+        content: const Text(
+          'Para que os lembretes funcionem, você precisa permitir "Notificações" e "Alarmes" nas configurações do seu celular.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCELAR')),
+          ElevatedButton(
+            onPressed: () {
+              openAppSettings(); // Abre as configs do Android direto no seu app
+              Navigator.pop(ctx);
+            },
+            child: const Text('ABRIR CONFIGURAÇÕES'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _escolherHora(TimeOfDay atual, ValueChanged<TimeOfDay> onSelecionado) async {

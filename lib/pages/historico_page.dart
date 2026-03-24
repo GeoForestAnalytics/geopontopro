@@ -82,7 +82,7 @@ class _HistoricoPageState extends State<HistoricoPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF0FDF4),
       appBar: AppBar(
-        title: const Text('Histórico de Pontos'),
+        title: Text('Histórico — ${widget.user.nome.split(' ')[0]}'),
         actions: [
           if (!_fechado)
             TextButton.icon(

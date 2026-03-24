@@ -68,48 +68,30 @@ class PontoService {
     return ponto;
   }
 
-  // ─── STREAMS (AQUI ESTÁ A ORDENAÇÃO) ──────────────────────────────────────
+  // ─── STREAMS ──────────────────────────────────────────────────────────────
   
-  // Stream para a HomePage do Colaborador
   Stream<List<PontoModel>> streamPontosHoje(String usuarioId) {
-    final hoje = DateTime.now();
-    final inicioDoDia = DateTime(hoje.year, hoje.month, hoje.day);
+    final now = DateTime.now();
+    final inicioDoDia = DateTime(now.year, now.month, now.day);
 
     return _db.collection('pontos')
         .where('usuarioId', isEqualTo: usuarioId)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicioDoDia))
-        .orderBy('timestamp', descending: false) // <--- ORDENAÇÃO CRUCIAL: Do primeiro ao último
+        .orderBy('timestamp', descending: false)
         .snapshots()
         .map((s) => s.docs.map((d) => PontoModel.fromFirestore(d)).toList());
   }
 
-  // Stream para o Painel do Gerente
   Stream<List<PontoModel>> streamTodosPontosHoje(String empresa) {
-    final hoje = DateTime.now();
-    final inicioDoDia = DateTime(hoje.year, hoje.month, hoje.day);
+    final now = DateTime.now();
+    final inicioDoDia = DateTime(now.year, now.month, now.day);
 
     return _db.collection('pontos')
         .where('empresa', isEqualTo: empresa)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicioDoDia))
-        .orderBy('timestamp', descending: true) // No dashboard, o mais recente aparece em cima
+        .orderBy('timestamp', descending: true)
         .snapshots()
         .map((s) => s.docs.map((d) => PontoModel.fromFirestore(d)).toList());
-  }
-
-  // ─── CONSULTAS ────────────────────────────────────────────────────────────
-  
-  Future<List<PontoModel>> obterPontosMes(String usuarioId, int mes, int ano) async {
-    final inicio = DateTime(ano, mes, 1);
-    final fim = DateTime(ano, mes + 1, 1);
-    
-    final query = await _db.collection('pontos')
-        .where('usuarioId', isEqualTo: usuarioId)
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
-        .where('timestamp', isLessThan: Timestamp.fromDate(fim))
-        .orderBy('timestamp', descending: false) // <--- Garante ordem no PDF/Histórico
-        .get();
-        
-    return query.docs.map((d) => PontoModel.fromFirestore(d)).toList();
   }
 
   Stream<List<Map<String, dynamic>>> streamTodosUsuarios(String empresa) {
@@ -119,8 +101,22 @@ class PontoService {
         .map((s) => s.docs.map((d) => {...d.data(), 'uid': d.id}).toList());
   }
 
-  // ─── ASSINATURAS ──────────────────────────────────────────────────────────
+  // ─── CONSULTAS ────────────────────────────────────────────────────────────
   
+  Future<List<PontoModel>> obterPontosMes(String usuarioId, int mes, int ano) async {
+    final inicio = DateTime(ano, mes, 1);
+    final fim = (mes == 12) ? DateTime(ano + 1, 1, 1) : DateTime(ano, mes + 1, 1);
+    
+    final query = await _db.collection('pontos')
+        .where('usuarioId', isEqualTo: usuarioId)
+        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
+        .where('timestamp', isLessThan: Timestamp.fromDate(fim))
+        .orderBy('timestamp', descending: false)
+        .get();
+        
+    return query.docs.map((d) => PontoModel.fromFirestore(d)).toList();
+  }
+
   Future<bool> verificarFechamentoExistente(String usuarioId, int mes, int ano) async {
     final doc = await _db.collection('fechamentos').doc('${usuarioId}_${ano}_$mes').get();
     return doc.exists;
@@ -152,4 +148,12 @@ class PontoService {
   }
 }
 
+// ─── PROVIDERS ─────────────────────────────────────────────────────────────
+
 final pontoServiceProvider = Provider((ref) => PontoService());
+
+// NOVO PROVIDER: Gerencia o Stream do Dashboard para não piscar
+final dashboardPontosProvider = StreamProvider.family<List<PontoModel>, String>((ref, empresa) {
+  final service = ref.watch(pontoServiceProvider);
+  return service.streamTodosPontosHoje(empresa);
+});

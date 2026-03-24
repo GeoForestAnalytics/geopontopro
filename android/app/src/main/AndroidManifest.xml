@@ -9,18 +9,17 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     
     <!-- 3. PERMISSÕES PARA LEMBRETES E ALARMES -->
-    <!-- Permite que o app recupere os lembretes se o celular for reiniciado -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <!-- Permite agendar alarmes exatos (ex: Bater ponto às 08:00) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:label="geoponto"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- 4. SERVIÇO DO FIREBASE MESSAGING (Obrigatório para Push) -->
+        <!-- 4. SERVIÇO DO FIREBASE MESSAGING -->
         <service
             android:name="com.google.firebase.messaging.FirebaseMessagingService"
             android:exported="false">
@@ -28,6 +27,18 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- 5. RECEIVERS PARA AGENDAMENTO DE NOTIFICAÇÕES (CRUCIAL PARA OS LEMBRETES) -->
+        <!-- Esse bloco permite que o app receba o sinal do relógio do Android para despertar -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".MainActivity"
@@ -59,7 +70,7 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <!-- Adicionado para suporte a links e PDF -->
+        <!-- Suporte a links e PDF -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />
