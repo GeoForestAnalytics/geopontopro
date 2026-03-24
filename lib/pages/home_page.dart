@@ -23,22 +23,29 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   bool _registrando = false;
 
-  // ─── LÓGICA DO BOTÃO INTELIGENTE ──────────────────────────────────────────
-  // Decide qual batida deve ser feita agora com base no que já foi batido hoje
-  TipoBatida _descobrirProximaBatida(List<PontoModel> pontos) {
-    if (pontos.isEmpty) return TipoBatida.entrada;
+  // ─── LÓGICA DE SEQUÊNCIA DE BATIDAS (RESTAURADA E COMPLETA) ────────────────
+  TipoBatida? _descobrirProximaBatida(List<PontoModel> pontos) {
+    // Pegamos apenas os tipos das batidas já realizadas hoje
+    final tiposJaFeitos = pontos.map((p) => p.tipo).toList();
+
+    if (!tiposJaFeitos.contains(TipoBatida.entrada)) {
+      return TipoBatida.entrada;
+    } 
+    if (!tiposJaFeitos.contains(TipoBatida.saidaAlmoco)) {
+      return TipoBatida.saidaAlmoco;
+    }
+    if (!tiposJaFeitos.contains(TipoBatida.retornoAlmoco)) {
+      return TipoBatida.retornoAlmoco;
+    }
+    if (!tiposJaFeitos.contains(TipoBatida.saida)) {
+      return TipoBatida.saida;
+    }
     
-    // Como os pontos vem ordenados por timestamp (do mais antigo para o novo no stream)
-    // nós contamos quantos registros existem hoje.
-    if (pontos.length == 1) return TipoBatida.saidaAlmoco;
-    if (pontos.length == 2) return TipoBatida.retornoAlmoco;
-    if (pontos.length == 3) return TipoBatida.saida;
-    
-    return TipoBatida.saida; // Caso tenha mais de 4, continua como saída por segurança
+    return null; // Caso todas as 4 batidas já existam
   }
 
-  // ─── CORES DINÂMICAS PARA O BOTÃO ─────────────────────────────────────────
-  Color _corBotao(TipoBatida tipo) {
+  // Cores dinâmicas para cada estado do botão
+  Color _getCorBatida(TipoBatida tipo) {
     switch (tipo) {
       case TipoBatida.entrada: return const Color(0xFF15803D); // Verde
       case TipoBatida.saidaAlmoco: return const Color(0xFFF59E0B); // Laranja
@@ -47,6 +54,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  // ─── TRATAMENTO DE GPS ──────────────────────────────────────────────────
   void _mostrarErroGPS(String erro) {
     showDialog(
       context: context,
@@ -117,11 +125,9 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
           body: StreamBuilder<List<PontoModel>>(
-            // Usamos o stream de pontos de hoje para alimentar o botão e a lista
             stream: ref.read(pontoServiceProvider).streamPontosHoje(user.uid),
             builder: (context, snapshot) {
               final pontos = snapshot.data ?? [];
-              // AQUI ESTÁ A MÁGICA: O botão descobre sozinho qual é o próximo passo
               final proxima = _descobrirProximaBatida(pontos);
               final now = DateTime.now();
 
@@ -130,21 +136,23 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. RELÓGIO EM TEMPO REAL (Não trava mais)
+                    // 1. RELÓGIO VIVO (NÃO TRAVA)
                     _buildRelogioVivo(user),
                     const SizedBox(height: 20),
 
-                    // 2. BOTÃO DINÂMICO
-                    _buildBotaoAcao(user, proxima, pontos.length),
-                    const SizedBox(height: 25),
+                    // 2. BOTÃO DINÂMICO (ENTRADA -> ALMOÇO -> RETORNO -> SAÍDA)
+                    if (proxima != null)
+                      _buildBotaoPonto(user, proxima)
+                    else
+                      _buildJornadaConcluida(),
 
-                    // 3. LISTA DE REGISTROS DO DIA
+                    const SizedBox(height: 25),
                     const Text('Registros de Hoje', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 10),
                     if (pontos.isEmpty)
-                      const Card(child: ListTile(title: Text('Nenhum registro ainda', style: TextStyle(color: Colors.grey, fontSize: 13))))
+                      const Card(child: ListTile(title: Text('Nenhum registro hoje', style: TextStyle(color: Colors.grey, fontSize: 13))))
                     else
-                      ...pontos.map((p) => _buildMiniCardPonto(p)).toList(),
+                      ...pontos.map((p) => _buildMiniCardPonto(p)),
 
                     const SizedBox(height: 25),
                     const Text('Menu de Opções', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -161,27 +169,25 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // ─── WIDGET: RELÓGIO QUE ATUALIZA SOZINHO ──────────────────────────────────
+  // --- WIDGETS AUXILIARES ---
+
   Widget _buildRelogioVivo(UserModel user) {
     return StreamBuilder<DateTime>(
-      // Cria um timer que "pinga" a cada 1 segundo
       stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
       builder: (context, snapshot) {
-        final horaAtual = snapshot.data ?? DateTime.now();
+        final hora = snapshot.data ?? DateTime.now();
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: const LinearGradient(colors: [Color(0xFF15803D), Color(0xFF16A34A)]),
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.2), blurRadius: 10)],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(horaAtual), style: const TextStyle(color: Colors.white70)),
-              const SizedBox(height: 4),
-              Text(DateFormat('HH:mm:ss').format(horaAtual), style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold)),
+              Text(DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(hora), style: const TextStyle(color: Colors.white70)),
+              Text(DateFormat('HH:mm:ss').format(hora), style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold)),
               Text('${user.nome} • ${user.empresa}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
             ],
           ),
@@ -190,23 +196,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // ─── WIDGET: BOTÃO QUE MUDA DE COR E TEXTO ─────────────────────────────────
-  Widget _buildBotaoAcao(UserModel user, TipoBatida proxima, int totalHoje) {
-    if (totalHoje >= 4) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.green)),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 10), Text('Jornada concluída hoje!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green))],
-        ),
-      );
-    }
-
+  Widget _buildBotaoPonto(UserModel user, TipoBatida proxima) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: _corBotao(proxima), // Cor muda conforme a batida
+        backgroundColor: _getCorBatida(proxima),
         minimumSize: const Size(double.infinity, 85),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         elevation: 4,
@@ -217,9 +210,21 @@ class _HomePageState extends ConsumerState<HomePage> {
         : Column(
             children: [
               Text('REGISTRAR ${proxima.label.toUpperCase()}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const Text('Toque para validar GPS e horário', style: TextStyle(fontSize: 11, fontWeight: FontWeight.normal, color: Colors.white70)),
+              const Text('Toque para validar GPS e horário', style: TextStyle(fontSize: 11, color: Colors.white70)),
             ],
           ),
+    );
+  }
+
+  Widget _buildJornadaConcluida() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.green)),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [Icon(Icons.check_circle, color: Colors.green), SizedBox(width: 10), Text('Jornada concluída hoje!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green))],
+      ),
     );
   }
 
@@ -230,7 +235,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[200]!)),
       child: ListTile(
         dense: true,
-        leading: Icon(Icons.check_circle, color: _corBotao(p.tipo), size: 20),
+        leading: Icon(Icons.check_circle, color: _getCorBatida(p.tipo), size: 20),
         title: Text(p.tipo.label, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(p.endereco, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
         trailing: Text(DateFormat('HH:mm').format(p.timestamp), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -268,18 +273,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: cor.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: cor, size: 28),
-            const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: cor, fontWeight: FontWeight.bold, fontSize: 12)),
-          ],
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: cor.withOpacity(0.2))),
+        child: Column(children: [Icon(icon, color: cor, size: 28), const SizedBox(height: 8), Text(label, style: TextStyle(color: cor, fontWeight: FontWeight.bold, fontSize: 12))]),
       ),
     );
   }

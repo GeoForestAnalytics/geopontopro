@@ -9,7 +9,7 @@ class PontoService {
   final _db = FirebaseFirestore.instance;
   final _uuid = const Uuid();
 
-  // ─── GPS ──────────────────────────────────────────────────────────────────
+  // ─── LOCALIZAÇÃO ──────────────────────────────────────────────────────────
   Future<Position> obterPosicao() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) throw 'GPS_DESLIGADO';
@@ -68,12 +68,9 @@ class PontoService {
     return ponto;
   }
 
-  // ─── STREAMS ──────────────────────────────────────────────────────────────
-  
+  // ─── STREAMS (FILTRADOS POR EMPRESA) ──────────────────────────────────────
   Stream<List<PontoModel>> streamPontosHoje(String usuarioId) {
-    final now = DateTime.now();
-    final inicioDoDia = DateTime(now.year, now.month, now.day);
-
+    final inicioDoDia = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     return _db.collection('pontos')
         .where('usuarioId', isEqualTo: usuarioId)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicioDoDia))
@@ -83,9 +80,7 @@ class PontoService {
   }
 
   Stream<List<PontoModel>> streamTodosPontosHoje(String empresa) {
-    final now = DateTime.now();
-    final inicioDoDia = DateTime(now.year, now.month, now.day);
-
+    final inicioDoDia = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     return _db.collection('pontos')
         .where('empresa', isEqualTo: empresa)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicioDoDia))
@@ -101,19 +96,16 @@ class PontoService {
         .map((s) => s.docs.map((d) => {...d.data(), 'uid': d.id}).toList());
   }
 
-  // ─── CONSULTAS ────────────────────────────────────────────────────────────
-  
+  // ─── CONSULTAS E ASSINATURAS ──────────────────────────────────────────────
   Future<List<PontoModel>> obterPontosMes(String usuarioId, int mes, int ano) async {
     final inicio = DateTime(ano, mes, 1);
     final fim = (mes == 12) ? DateTime(ano + 1, 1, 1) : DateTime(ano, mes + 1, 1);
-    
     final query = await _db.collection('pontos')
         .where('usuarioId', isEqualTo: usuarioId)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
         .where('timestamp', isLessThan: Timestamp.fromDate(fim))
         .orderBy('timestamp', descending: false)
         .get();
-        
     return query.docs.map((d) => PontoModel.fromFirestore(d)).toList();
   }
 
@@ -148,12 +140,10 @@ class PontoService {
   }
 }
 
-// ─── PROVIDERS ─────────────────────────────────────────────────────────────
-
+// ─── PROVIDERS (ESTABILIZADORES DE TELA) ───────────────────────────────────
 final pontoServiceProvider = Provider((ref) => PontoService());
 
-// NOVO PROVIDER: Gerencia o Stream do Dashboard para não piscar
-final dashboardPontosProvider = StreamProvider.family<List<PontoModel>, String>((ref, empresa) {
-  final service = ref.watch(pontoServiceProvider);
-  return service.streamTodosPontosHoje(empresa);
+// Este provider mata o "pisca-pisca" no Monitor do Gerente
+final monitorPontosProvider = StreamProvider.family<List<PontoModel>, String>((ref, empresa) {
+  return ref.watch(pontoServiceProvider).streamTodosPontosHoje(empresa);
 });
