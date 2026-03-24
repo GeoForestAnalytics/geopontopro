@@ -11,7 +11,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import 'package:intl/intl.dart';
 import '../models/user_model.dart';
 import '../services/ponto_service.dart';
 import '../services/pdf_service.dart';
