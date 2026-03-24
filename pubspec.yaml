@@ -52,10 +52,30 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  
+  # --- GERADORES DE ÍCONE E SPLASH ---
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
 
 flutter:
   uses-material-design: true
   
-  # Certifique-se de que a pasta assets/images realmente existe no seu projeto
   assets:
     - assets/images/
+
+# --- CONFIGURAÇÃO DO ÍCONE DO APP ---
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo.png"
+  adaptive_icon_background: "#f0fdf4" # Um fundo verde bem clarinho para destacar o vidro
+  adaptive_icon_foreground: "assets/images/logo.png"
+
+# --- CONFIGURAÇÃO DA TELA DE SPLASH (ABERTURA) ---
+flutter_native_splash:
+  color: "#15803D" # O verde principal do seu app
+  image: "assets/images/logo.png"
+  android_12:
+    image: "assets/images/logo.png"
+    color: "#15803D"
+  fullscreen: true

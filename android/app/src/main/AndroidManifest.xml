@@ -17,7 +17,7 @@
     <application
         android:label="geoponto"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
 
         <!-- 4. SERVIÇO DO FIREBASE MESSAGING -->
         <service
