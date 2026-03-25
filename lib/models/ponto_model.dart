@@ -36,27 +36,27 @@ class PontoModel {
   final String id;
   final String usuarioId;
   final String usuarioNome;
-  final String empresaId;
+  final String empresaId; // <--- PADRONIZADO PARA empresaId
   final TipoBatida tipo;
   final DateTime timestamp;
   final double latitude;
   final double longitude;
   final String endereco;
   final bool offline;
-  final String comentario; // <--- NOVO
+  final String comentario;
 
   PontoModel({
     required this.id,
     required this.usuarioId,
     required this.usuarioNome,
-    required this.empresaId,
+    required this.empresaId, // <--- PADRONIZADO
     required this.tipo,
     required this.timestamp,
     required this.latitude,
     required this.longitude,
     required this.endereco,
     this.offline = false,
-    this.comentario = '', // <--- NOVO
+    this.comentario = '',
   });
 
   factory PontoModel.fromFirestore(DocumentSnapshot doc) {
@@ -65,7 +65,7 @@ class PontoModel {
       id: doc.id,
       usuarioId: d['usuarioId'] ?? '',
       usuarioNome: d['usuarioNome'] ?? '',
-      empresaId: d['empresaId'] ?? '',
+      empresaId: d['empresaId'] ?? '', // <--- PADRONIZADO
       tipo: TipoBatidaExt.fromString(d['tipo'] ?? 'entrada'),
       timestamp: (d['timestamp'] as Timestamp).toDate(),
       latitude: (d['latitude'] ?? 0.0).toDouble(),
@@ -79,7 +79,7 @@ class PontoModel {
   Map<String, dynamic> toMap() => {
     'usuarioId': usuarioId,
     'usuarioNome': usuarioNome,
-    'empresaId': empresaId,
+    'empresaId': empresaId, // <--- PADRONIZADO
     'tipo': tipo.value,
     'timestamp': Timestamp.fromDate(timestamp),
     'latitude': latitude,

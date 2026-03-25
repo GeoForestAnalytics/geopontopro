@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:geolocator/geolocator.dart'; // <--- SERÁ USADO NO _mostrarErroGPS
+import 'package:geolocator/geolocator.dart'; 
 import '../models/ponto_model.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
@@ -11,9 +11,9 @@ import 'login_page.dart';
 import 'historico_page.dart';
 import 'assinatura_page.dart';
 import 'mapa_pontos_page.dart';
-import 'banco_horas_page.dart'; // <--- RESTAURADO NA GRADE
+import 'banco_horas_page.dart'; 
 import 'espelho_ponto_page.dart';
-import 'configurar_lembretes_page.dart'; // <--- RESTAURADO NA GRADE
+import 'configurar_lembretes_page.dart'; 
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -46,7 +46,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  // ─── TRATAMENTO DE GPS (RESTAURADO) ───────────────────────────────────────
+  // ─── TRATAMENTO DE GPS ──────────────────────────────────────────────────
   void _mostrarErroGPS(String erro) {
     showDialog(
       context: context,
@@ -57,7 +57,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () {
-              Geolocator.openLocationSettings(); // Usa o import do geolocator
+              Geolocator.openLocationSettings();
               Navigator.pop(ctx);
             },
             child: const Text('Configurar'),
@@ -98,7 +98,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // ─── REGISTRO DE PONTO ────────────────────────────────────────────────────
   Future<void> _registrarPonto(UserModel user, TipoBatida tipo, {String comentario = ''}) async {
     setState(() => _registrando = true);
     try {
@@ -121,11 +120,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         SnackBar(content: Text('${tipo.label} registrada!'), backgroundColor: Colors.green)
       );
     } catch (e) {
-      if (!mounted) return;
-      if (e == 'GPS_DESLIGADO' || e == 'PERMISSAO_NEGADA') {
-        _mostrarErroGPS(e.toString());
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+      if (mounted) {
+        if (e == 'GPS_DESLIGADO' || e == 'PERMISSAO_NEGADA') {
+          _mostrarErroGPS(e.toString());
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+        }
       }
     } finally {
       if (mounted) setState(() => _registrando = false);
@@ -186,7 +186,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
 
                     const SizedBox(height: 25),
-                    _buildGridAcoes(user, now),
+                    _buildGridAcoes(user),
                     const SizedBox(height: 20),
                     
                     ...pontos.map((p) => _buildPontoCard(p)).toList(),
@@ -268,8 +268,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     ),
   );
 
-  // ─── GRADE COM OS 6 BOTÕES RESTAURADOS ────────────────────────────────────
-  Widget _buildGridAcoes(UserModel user, DateTime now) => Column(
+  Widget _buildGridAcoes(UserModel user) => Column(
     children: [
       Row(children: [
         Expanded(child: _acao(Icons.history, 'Histórico', Colors.blue, () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistoricoPage(user: user))))),
@@ -284,7 +283,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       ]),
       const SizedBox(height: 10),
       Row(children: [
-        Expanded(child: _acao(Icons.picture_as_pdf, 'Relat. PDF', Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => EspelhoPontoPage(user: user, mes: now.month, ano: now.year))))),
+        Expanded(child: _acao(Icons.picture_as_pdf, 'Relat. PDF', Colors.red, () => Navigator.push(context, MaterialPageRoute(builder: (_) => EspelhoPontoPage(user: user, mes: DateTime.now().month, ano: DateTime.now().year))))),
         const SizedBox(width: 10),
         Expanded(child: _acao(Icons.notifications_active, 'Lembretes', Colors.green, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConfigurarLembretesPage())))),
       ]),
