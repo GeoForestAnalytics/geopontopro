@@ -258,7 +258,8 @@ class _HistoricoPageState extends State<HistoricoPage> {
                                   leading: Icon(_icone(p.tipo), color: _cor(p.tipo), size: 20),
                                   title: Text(p.tipo.label,
                                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                                  subtitle: Text(p.endereco,
+                                  subtitle: Text(
+                                      p.comentario.isNotEmpty ? p.comentario : p.endereco,
                                       style: const TextStyle(fontSize: 11),
                                       maxLines: 1, overflow: TextOverflow.ellipsis),
                                   trailing: Row(
@@ -300,6 +301,7 @@ class _HistoricoPageState extends State<HistoricoPage> {
       case TipoBatida.saidaAlmoco:   return const Color(0xFFF59E0B);
       case TipoBatida.retornoAlmoco: return const Color(0xFF3B82F6);
       case TipoBatida.saida:         return const Color(0xFFEF4444);
+      case TipoBatida.observacao:    return Colors.blueGrey; // Cor para o novo tipo
     }
   }
 
@@ -309,6 +311,7 @@ class _HistoricoPageState extends State<HistoricoPage> {
       case TipoBatida.saidaAlmoco:   return Icons.restaurant;
       case TipoBatida.retornoAlmoco: return Icons.replay;
       case TipoBatida.saida:         return Icons.logout;
+      case TipoBatida.observacao:    return Icons.info_outline; // Ícone para o novo tipo
     }
   }
 }

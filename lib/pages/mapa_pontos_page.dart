@@ -71,6 +71,7 @@ class _MapaPontosPageState extends State<MapaPontosPage> {
       case TipoBatida.saidaAlmoco:   return const Color(0xFFF59E0B);
       case TipoBatida.retornoAlmoco: return const Color(0xFF3B82F6);
       case TipoBatida.saida:         return const Color(0xFFEF4444);
+      case TipoBatida.observacao:    return Colors.blueGrey; // <--- ADICIONADO
     }
   }
 
@@ -80,6 +81,7 @@ class _MapaPontosPageState extends State<MapaPontosPage> {
       case TipoBatida.saidaAlmoco:   return Icons.restaurant;
       case TipoBatida.retornoAlmoco: return Icons.replay;
       case TipoBatida.saida:         return Icons.logout;
+      case TipoBatida.observacao:    return Icons.info_outline; // <--- ADICIONADO
     }
   }
 
@@ -89,7 +91,7 @@ class _MapaPontosPageState extends State<MapaPontosPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Mapa — ${meses[_mes]} $_ano'),
+        title: Text('Mapa — ${widget.user.nome.split(' ')[0]}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.my_location),
@@ -221,13 +223,11 @@ class _MapaPontosPageState extends State<MapaPontosPage> {
         points: pts.map((p) => LatLng(p.latitude, p.longitude)).toList(),
         color: Colors.green.withOpacity(0.4),
         strokeWidth: 3,
-        // No flutter_map v7, isDotted não existe mais diretamente desta forma
       );
     }).toList();
   }
 
   Widget _buildCardSelecionado(PontoModel p) {
-    // CORREÇÃO DOS ERROS DE STRING E DATEFORMAT AQUI:
     final String dataFormatada = DateFormat("dd/MM/yyyy 'às' HH:mm", "pt_BR").format(p.timestamp);
 
     return Container(
@@ -254,7 +254,12 @@ class _MapaPontosPageState extends State<MapaPontosPage> {
                 Text(p.tipo.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 Text(dataFormatada, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                 const SizedBox(height: 2),
-                Text(p.endereco, style: TextStyle(color: Colors.grey[500], fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  p.comentario.isNotEmpty ? p.comentario : p.endereco, 
+                  style: TextStyle(color: Colors.grey[500], fontSize: 11), 
+                  maxLines: 1, 
+                  overflow: TextOverflow.ellipsis
+                ),
               ],
             ),
           ),

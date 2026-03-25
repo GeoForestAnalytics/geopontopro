@@ -3,61 +3,37 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'dart:typed_data';
 import '../models/ponto_model.dart';
 
 class PontoService {
   final _db = FirebaseFirestore.instance;
   final _uuid = const Uuid();
 
-  // ─── LOCALIZAÇÃO COM TIMEOUT (PARA NÃO TRAVAR OFFLINE) ────────────────────────────
-  Future<Position> obterPosicao() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) throw 'GPS_DESLIGADO';
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) throw 'PERMISSAO_NEGADA';
-    }
-
-    // Timeout de 6 segundos: se o satélite não responder, o app não fica "girando" infinito
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 6),
-    );
-  }
-
-  Future<String> obterEndereco(double lat, double lng) async {
-    try {
-      // Tradução de endereço exige internet. Colocamos timeout de 3s.
-      final placemarks = await placemarkFromCoordinates(lat, lng)
-          .timeout(const Duration(seconds: 3));
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        return '${p.street}, ${p.subLocality}, ${p.locality}';
-      }
-    } catch (_) {
-      // Em caso de falha ou falta de internet, retorna as coordenadas cruas
-    }
-    return 'Lat: ${lat.toStringAsFixed(4)}, Lng: ${lng.toStringAsFixed(4)} (Sinal fraco)';
-  }
-
-  // ─── REGISTRO INSTANTÂNEO (LOCAL-FIRST) ──────────────────────────────────
+  // ─── REGISTRO DE PONTO ────────────────────────────────────────────────────
   Future<PontoModel> registrarPonto({
     required String usuarioId,
     required String usuarioNome,
-    required String empresa,
+    required String empresaId,
     required TipoBatida tipo,
+    String comentario = '', // <--- ADICIONADO
   }) async {
     Position? pos;
     String endereco = 'Localização Offline';
     bool offline = false;
 
     try {
-      pos = await obterPosicao();
-      endereco = await obterEndereco(pos.latitude, pos.longitude);
+      pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 5),
+      );
+      final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude).timeout(const Duration(seconds: 3));
+      if (placemarks.isNotEmpty) {
+        endereco = '${placemarks.first.street}, ${placemarks.first.subLocality}';
+      }
     } catch (e) {
-      // Se der erro de GPS ou Timeout, marcamos como offline e seguimos
       offline = true;
     }
 
@@ -65,104 +41,99 @@ class PontoService {
       id: _uuid.v4(),
       usuarioId: usuarioId,
       usuarioNome: usuarioNome,
-      empresa: empresa,
+      empresaId: empresaId,
       tipo: tipo,
       timestamp: DateTime.now(),
       latitude: pos?.latitude ?? 0.0,
       longitude: pos?.longitude ?? 0.0,
       endereco: endereco,
       offline: offline,
+      comentario: comentario,
     );
 
-    // REMOVIDO O 'AWAIT': O app grava no banco interno do celular imediatamente.
-    // O Firebase SDK cuida de enviar para a nuvem em segundo plano quando houver rede.
     _db.collection('pontos').doc(ponto.id).set(ponto.toMap());
-    
     return ponto;
   }
 
-  // ─── STREAMS COM SUPORTE A CACHE (includeMetadataChanges: true) ──────────
-  // O parâmetro 'includeMetadataChanges' faz o ponto aparecer na lista 
-  // no exato segundo que você clica no botão, mesmo sem internet.
-
+  // ─── STREAMS ESTABILIZADOS ─────────────────────────────────────────────────
   Stream<List<PontoModel>> streamPontosHoje(String usuarioId) {
-    final inicioDoDia = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final inicio = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     return _db.collection('pontos')
         .where('usuarioId', isEqualTo: usuarioId)
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicioDoDia))
+        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
         .orderBy('timestamp', descending: false)
-        .snapshots(includeMetadataChanges: true) 
+        .snapshots(includeMetadataChanges: false) // <--- DESLIGADO PARA EVITAR LOOP NO MONITOR
         .map((s) => s.docs.map((d) => PontoModel.fromFirestore(d)).toList());
   }
 
-  Stream<List<PontoModel>> streamTodosPontosHoje(String empresa) {
-    final inicioDoDia = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+  Stream<List<PontoModel>> streamTodosPontosHoje(String empresaId) {
+    final inicio = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     return _db.collection('pontos')
-        .where('empresa', isEqualTo: empresa)
-        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicioDoDia))
+        .where('empresaId', isEqualTo: empresaId)
+        .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
         .orderBy('timestamp', descending: true)
-        .snapshots(includeMetadataChanges: true)
+        .snapshots()
         .map((s) => s.docs.map((d) => PontoModel.fromFirestore(d)).toList());
   }
 
-  Stream<List<Map<String, dynamic>>> streamTodosUsuarios(String empresa) {
+  Stream<List<Map<String, dynamic>>> streamTodosUsuarios(String empresaId) {
     return _db.collection('usuarios')
-        .where('empresa', isEqualTo: empresa)
-        .snapshots(includeMetadataChanges: true)
+        .where('empresaId', isEqualTo: empresaId)
+        .snapshots()
         .map((s) => s.docs.map((d) => {...d.data(), 'uid': d.id}).toList());
   }
 
-  // ─── CONSULTAS COM FONTE HÍBRIDA ─────────────────────────────────────────
+  // ─── FUNÇÃO DE EXPORTAÇÃO EXCEL/CSV ────────────────────────────────────────
+  Future<void> exportarPontosParaCSV(List<PontoModel> pontos, String nomeFuncionario) async {
+    String csv = "Data;Hora;Colaborador;Tipo;Endereco;Latitude;Longitude;Observacao\n";
+    
+    for (var p in pontos) {
+      csv += "${DateFormat('dd/MM/yyyy').format(p.timestamp)};";
+      csv += "${DateFormat('HH:mm').format(p.timestamp)};";
+      csv += "${p.usuarioNome};";
+      csv += "${p.tipo.label};";
+      csv += "${p.endereco.replaceAll(';', ',')};";
+      csv += "${p.latitude};";
+      csv += "${p.longitude};";
+      csv += "${p.comentario.replaceAll(';', ',')}\n";
+    }
+
+    final bytes = Uint8List.fromList(csv.codeUnits);
+    await Printing.sharePdf(bytes: bytes, filename: 'relatorio_${nomeFuncionario}.csv');
+  }
+
+  // --- Outros métodos (obterPontosMes, etc) ---
   Future<List<PontoModel>> obterPontosMes(String usuarioId, int mes, int ano) async {
     final inicio = DateTime(ano, mes, 1);
     final fim = (mes == 12) ? DateTime(ano + 1, 1, 1) : DateTime(ano, mes + 1, 1);
-    
     final query = await _db.collection('pontos')
         .where('usuarioId', isEqualTo: usuarioId)
         .where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
         .where('timestamp', isLessThan: Timestamp.fromDate(fim))
         .orderBy('timestamp', descending: false)
-        .get(const GetOptions(source: Source.serverAndCache)); // Prioriza servidor, mas usa cache se offline
-        
+        .get();
     return query.docs.map((d) => PontoModel.fromFirestore(d)).toList();
   }
 
-  // ─── ASSINATURAS E FECHAMENTO ─────────────────────────────────────────────
   Future<bool> verificarFechamentoExistente(String usuarioId, int mes, int ano) async {
     final doc = await _db.collection('fechamentos').doc('${usuarioId}_${ano}_$mes').get();
     return doc.exists;
+  }
+
+  Future<void> salvarAssinatura({required String usuarioId, required String usuarioNome, required String empresaId, required int mes, required int ano, required String assinaturaBase64}) async {
+    _db.collection('fechamentos').doc('${usuarioId}_${ano}_$mes').set({
+      'usuarioId': usuarioId, 'usuarioNome': usuarioNome, 'empresaId': empresaId, 'mes': mes, 'ano': ano, 'assinaturaBase64': assinaturaBase64, 'assinadoEm': FieldValue.serverTimestamp(), 'fechado': true,
+    });
   }
 
   Future<FechamentoMensal?> obterFechamento(String usuarioId, int mes, int ano) async {
     final doc = await _db.collection('fechamentos').doc('${usuarioId}_${ano}_$mes').get();
     return doc.exists ? FechamentoMensal.fromFirestore(doc) : null;
   }
-
-  Future<void> salvarAssinatura({
-    required String usuarioId,
-    required String usuarioNome,
-    required String empresa,
-    required int mes,
-    required int ano,
-    required String assinaturaBase64,
-  }) async {
-    // Também grava assinatura localmente primeiro
-    _db.collection('fechamentos').doc('${usuarioId}_${ano}_$mes').set({
-      'usuarioId': usuarioId,
-      'usuarioNome': usuarioNome,
-      'empresa': empresa,
-      'mes': mes,
-      'ano': ano,
-      'assinaturaBase64': assinaturaBase64,
-      'assinadoEm': FieldValue.serverTimestamp(),
-      'fechado': true,
-    });
-  }
 }
 
-// ─── PROVIDERS (ESTABILIZADORES DE TELA) ───────────────────────────────────
 final pontoServiceProvider = Provider((ref) => PontoService());
 
-final monitorPontosProvider = StreamProvider.family<List<PontoModel>, String>((ref, empresa) {
-  return ref.watch(pontoServiceProvider).streamTodosPontosHoje(empresa);
+final monitorPontosProvider = StreamProvider.family<List<PontoModel>, String>((ref, empresaId) {
+  return ref.watch(pontoServiceProvider).streamTodosPontosHoje(empresaId);
 });
