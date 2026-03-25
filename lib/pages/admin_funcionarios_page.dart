@@ -10,6 +10,7 @@ class AdminFuncionariosPage extends ConsumerStatefulWidget {
 }
 
 class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
+  // Controladores
   final _nomeCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _senhaCtrl = TextEditingController();
@@ -20,7 +21,6 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
 
   @override
   void dispose() {
-    // Só damos dispose quando a página inteira fechar, não o modal
     _nomeCtrl.dispose();
     _emailCtrl.dispose();
     _senhaCtrl.dispose();
@@ -28,26 +28,28 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
     super.dispose();
   }
 
-  Future<void> _processarCriacao(String empresaAdmin) async {
-    if (_nomeCtrl.text.isEmpty || _emailCtrl.text.isEmpty) {
-      setState(() => _erro = "Preencha os campos obrigatórios.");
+  // Lógica de criação usando os novos campos empresaId e empresaNome
+  Future<void> _processarCriacao(String empresaId, String empresaNome) async {
+    if (_nomeCtrl.text.isEmpty || _emailCtrl.text.isEmpty || _senhaCtrl.text.length < 6) {
+      setState(() => _erro = "Preencha os campos (Senha mín. 6 chars)");
       return;
     }
 
     setState(() { _loading = true; _erro = null; });
     
     try {
-      await ref.read(authServiceProvider).criarUsuario(
+      // CORREÇÃO: Usando o método correto 'criarUsuarioEquipe' do seu AuthService
+      await ref.read(authServiceProvider).criarUsuarioEquipe(
         nome: _nomeCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         senha: _senhaCtrl.text,
         cargo: _cargoCtrl.text.trim(),
-        empresa: empresaAdmin,
+        empresaId: empresaId,     // <--- Passando o ID
+        empresaNome: empresaNome, // <--- Passando o Nome
         isGerente: _novoEhGerente,
       );
 
       if (mounted) {
-        // CORREÇÃO: Limpamos ANTES de fechar o modal
         _nomeCtrl.clear();
         _emailCtrl.clear();
         _senhaCtrl.clear();
@@ -67,19 +69,23 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Pegamos o perfil do Admin logado
     final admin = ref.watch(userProfileProvider).value;
     if (admin == null) return const Center(child: CircularProgressIndicator());
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0FDF4),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _abrirModal(admin.empresa),
+        // CORREÇÃO: Passando os dados da empresa do admin
+        onPressed: () => _abrirModal(admin.empresaId, admin.empresaNome),
         child: const Icon(Icons.person_add),
       ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: PontoService().streamTodosUsuarios(admin.empresa),
+        // CORREÇÃO: Buscando usuários pelo empresaId
+        stream: PontoService().streamTodosUsuarios(admin.empresaId),
         builder: (context, snapshot) {
           final lista = snapshot.data ?? [];
+          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
           if (lista.isEmpty) return const Center(child: Text("Nenhum membro na equipe."));
 
           return ListView.builder(
@@ -89,9 +95,13 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
               final u = lista[i];
               final isGer = u['isAdmin'] == true;
               return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
-                  leading: CircleAvatar(backgroundColor: isGer ? Colors.purple[100] : Colors.blue[100], 
-                  child: Icon(isGer ? Icons.admin_panel_settings : Icons.person, color: isGer ? Colors.purple : Colors.blue)),
+                  leading: CircleAvatar(
+                    backgroundColor: isGer ? Colors.purple[100] : Colors.blue[100], 
+                    child: Icon(isGer ? Icons.admin_panel_settings : Icons.person, color: isGer ? Colors.purple : Colors.blue)
+                  ),
                   title: Text(u['nome'], style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(u['cargo'] ?? 'Colaborador'),
                 ),
@@ -103,7 +113,7 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
     );
   }
 
-  void _abrirModal(String empresaAdmin) {
+  void _abrirModal(String empresaId, String empresaNome) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -128,15 +138,15 @@ class _AdminFuncionariosPageState extends ConsumerState<AdminFuncionariosPage> {
               const SizedBox(height: 20),
               TextField(controller: _nomeCtrl, decoration: const InputDecoration(labelText: 'Nome Completo')),
               TextField(controller: _emailCtrl, decoration: const InputDecoration(labelText: 'E-mail')),
-              TextField(controller: _senhaCtrl, decoration: const InputDecoration(labelText: 'Senha (mín. 6 chars)')),
+              TextField(controller: _senhaCtrl, decoration: const InputDecoration(labelText: 'Senha')),
               TextField(controller: _cargoCtrl, decoration: const InputDecoration(labelText: 'Cargo')),
-              if (_erro != null) Text(_erro!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              if (_erro != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_erro!, style: const TextStyle(color: Colors.red, fontSize: 12))),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _loading ? null : () => _processarCriacao(empresaAdmin),
+                  onPressed: _loading ? null : () => _processarCriacao(empresaId, empresaNome),
                   child: _loading ? const CircularProgressIndicator() : const Text('CRIAR ACESSO'),
                 ),
               ),

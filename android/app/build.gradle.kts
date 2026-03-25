@@ -11,35 +11,39 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        // CORREÇÃO: No Kotlin DSL usamos 'isCoreLibraryDesugaringEnabled'
+        // Habilita suporte a Java 8+ em Androids antigos
         isCoreLibraryDesugaringEnabled = true
-        
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        // CORREÇÃO: Ajustado para evitar o aviso de 'deprecated'
+        // Forma correta de definir o target no Kotlin DSL
         jvmTarget = "17"
     }
 
     defaultConfig {
         applicationId = "com.example.geoponto"
         
-        // Mínimo necessário para as bibliotecas de Ponto e Firebase
+        // Mínimo para Firebase e GPS
         minSdk = flutter.minSdkVersion 
-
-        // Necessário para o Firebase não travar na compilação
-        multiDexEnabled = true
-
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        multiDexEnabled = true
     }
 
     buildTypes {
         getByName("release") {
+            // Usamos a chave de debug para o APK funcionar sem precisar criar uma JKS agora
             signingConfig = signingConfigs.getByName("debug")
+
+            // CORREÇÃO AQUI: No .kts o nome correto tem o prefixo 'is'
+            isMinifyEnabled = false
+            isShrinkResources = false
+            
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
@@ -49,6 +53,6 @@ flutter {
 }
 
 dependencies {
-    // Biblioteca de tradução de recursos Java 8+
+    // Biblioteca de "tradução" para recursos Java 8+
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

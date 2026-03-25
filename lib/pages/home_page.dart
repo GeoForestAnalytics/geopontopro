@@ -23,9 +23,8 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   bool _registrando = false;
 
-  // ─── LÓGICA DE SEQUÊNCIA DE BATIDAS (RESTAURADA E COMPLETA) ────────────────
+  // ─── LÓGICA DE SEQUÊNCIA DE BATIDAS ───────────────────────────────────────
   TipoBatida? _descobrirProximaBatida(List<PontoModel> pontos) {
-    // Pegamos apenas os tipos das batidas já realizadas hoje
     final tiposJaFeitos = pontos.map((p) => p.tipo).toList();
 
     if (!tiposJaFeitos.contains(TipoBatida.entrada)) {
@@ -41,16 +40,15 @@ class _HomePageState extends ConsumerState<HomePage> {
       return TipoBatida.saida;
     }
     
-    return null; // Caso todas as 4 batidas já existam
+    return null; 
   }
 
-  // Cores dinâmicas para cada estado do botão
   Color _getCorBatida(TipoBatida tipo) {
     switch (tipo) {
-      case TipoBatida.entrada: return const Color(0xFF15803D); // Verde
-      case TipoBatida.saidaAlmoco: return const Color(0xFFF59E0B); // Laranja
-      case TipoBatida.retornoAlmoco: return const Color(0xFF3B82F6); // Azul
-      case TipoBatida.saida: return const Color(0xFFEF4444); // Vermelho
+      case TipoBatida.entrada: return const Color(0xFF15803D);
+      case TipoBatida.saidaAlmoco: return const Color(0xFFF59E0B);
+      case TipoBatida.retornoAlmoco: return const Color(0xFF3B82F6);
+      case TipoBatida.saida: return const Color(0xFFEF4444);
     }
   }
 
@@ -78,28 +76,35 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _registrarPonto(UserModel user, TipoBatida tipo) async {
     setState(() => _registrando = true);
     try {
+      // Chamada assíncrona ao banco de dados
       await ref.read(pontoServiceProvider).registrarPonto(
         usuarioId: user.uid,
         usuarioNome: user.nome,
-        empresa: user.empresa,
+        empresa: user.empresaId, // <--- Ajustado para a nova lógica SaaS
         tipo: tipo,
       );
       
+      // VERIFICAÇÃO DE MONTADO: Resolve o erro "use_build_context_synchronously"
+      if (!mounted) return;
+
       NotificationService().notificarPontoRegistrado(
         tipo.label, 
         DateFormat('HH:mm').format(DateTime.now())
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${tipo.label} registrada!'), backgroundColor: Colors.green),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${tipo.label} registrada!'), backgroundColor: Colors.green),
+      );
     } catch (e) {
+      // VERIFICAÇÃO DE MONTADO: Necessária também no bloco de erro
+      if (!mounted) return;
+
       if (e == 'GPS_DESLIGADO' || e == 'PERMISSAO_NEGADA') {
         _mostrarErroGPS(e.toString());
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao registrar: $e'), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _registrando = false);
@@ -121,7 +126,10 @@ class _HomePageState extends ConsumerState<HomePage> {
           appBar: AppBar(
             title: const Text('GeoPonto Pro', style: TextStyle(fontWeight: FontWeight.bold)),
             actions: [
-              IconButton(onPressed: () => ref.read(authServiceProvider).logout(), icon: const Icon(Icons.logout))
+              IconButton(
+                onPressed: () => ref.read(authServiceProvider).logout(), 
+                icon: const Icon(Icons.logout)
+              )
             ],
           ),
           body: StreamBuilder<List<PontoModel>>(
@@ -136,11 +144,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. RELÓGIO VIVO (NÃO TRAVA)
                     _buildRelogioVivo(user),
                     const SizedBox(height: 20),
 
-                    // 2. BOTÃO DINÂMICO (ENTRADA -> ALMOÇO -> RETORNO -> SAÍDA)
                     if (proxima != null)
                       _buildBotaoPonto(user, proxima)
                     else
@@ -188,7 +194,8 @@ class _HomePageState extends ConsumerState<HomePage> {
             children: [
               Text(DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(hora), style: const TextStyle(color: Colors.white70)),
               Text(DateFormat('HH:mm:ss').format(hora), style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold)),
-              Text('${user.nome} • ${user.empresa}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+              // CORREÇÃO: Usando 'empresaNome'
+              Text('${user.nome} • ${user.empresaNome}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
             ],
           ),
         );

@@ -5,7 +5,8 @@ class UserModel {
   final String nome;
   final String email;
   final String cargo;
-  final String empresa;
+  final String empresaId; // <--- AGORA USAMOS O ID ÚNICO
+  final String empresaNome; // Nome para exibição rápida
   final bool isAdmin;
   final DateTime criadoEm;
 
@@ -14,7 +15,8 @@ class UserModel {
     required this.nome,
     required this.email,
     required this.cargo,
-    required this.empresa,
+    required this.empresaId,
+    required this.empresaNome,
     required this.isAdmin,
     required this.criadoEm,
   });
@@ -26,7 +28,8 @@ class UserModel {
       nome: data['nome'] ?? '',
       email: data['email'] ?? '',
       cargo: data['cargo'] ?? '',
-      empresa: data['empresa'] ?? '',
+      empresaId: data['empresaId'] ?? '',
+      empresaNome: data['empresaNome'] ?? '',
       isAdmin: data['isAdmin'] ?? false,
       criadoEm: (data['criadoEm'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -36,7 +39,8 @@ class UserModel {
     'nome': nome,
     'email': email,
     'cargo': cargo,
-    'empresa': empresa,
+    'empresaId': empresaId,
+    'empresaNome': empresaNome,
     'isAdmin': isAdmin,
     'criadoEm': Timestamp.fromDate(criadoEm),
   };

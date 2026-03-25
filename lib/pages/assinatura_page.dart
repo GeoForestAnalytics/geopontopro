@@ -124,11 +124,11 @@ class _AssinaturaPageState extends State<AssinaturaPage> {
 
       final base64 = base64Encode(imgBytes);
       
-      // CORREÇÃO: Adicionado o parâmetro 'empresa' que é obrigatório no PontoService
+      // CORREÇÃO: Utilizando 'empresaId' que é o campo correto agora no UserModel
       await PontoService().salvarAssinatura(
         usuarioId: widget.user.uid,
         usuarioNome: widget.user.nome,
-        empresa: widget.user.empresa, // <--- Valor obtido do UserModel
+        empresa: widget.user.empresaId, // <--- ALTERADO DE empresa PARA empresaId
         mes: _mes,
         ano: _ano,
         assinaturaBase64: base64,

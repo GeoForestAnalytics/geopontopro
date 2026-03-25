@@ -1,11 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 1. PERMISSÕES DE INTERNET E GPS -->
+    <!-- 1. PERMISSÕES DE REDE E GPS -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     
-    <!-- 2. PERMISSÕES PARA NOTIFICAÇÕES (Obrigatório para Android 13+) -->
+    <!-- 2. PERMISSÕES PARA NOTIFICAÇÕES (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     
     <!-- 3. PERMISSÕES PARA LEMBRETES E ALARMES -->
@@ -15,7 +15,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
-        android:label="geoponto"
+        android:label="GeoPonto Pro"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
 
@@ -28,8 +28,7 @@
             </intent-filter>
         </service>
 
-        <!-- 5. RECEIVERS PARA AGENDAMENTO DE NOTIFICAÇÕES (CRUCIAL PARA OS LEMBRETES) -->
-        <!-- Esse bloco permite que o app receba o sinal do relógio do Android para despertar -->
+        <!-- 5. RECEIVERS PARA AGENDAMENTO DE NOTIFICAÇÕES -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
             <intent-filter>
@@ -70,7 +69,6 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <!-- Suporte a links e PDF -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />

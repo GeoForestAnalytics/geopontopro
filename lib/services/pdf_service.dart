@@ -140,7 +140,8 @@ class PdfService {
               children: [
                 _infoLinha('Funcionário', u.nome),
                 _infoLinha('Cargo', u.cargo),
-                _infoLinha('Empresa', u.empresa),
+                // CORREÇÃO: Usando 'empresaNome' em vez de 'empresa'
+                _infoLinha('Empresa', u.empresaNome),
                 _infoLinha('E-mail', u.email),
               ],
             ),
