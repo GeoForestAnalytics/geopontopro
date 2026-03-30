@@ -1,14 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 1. PERMISSÕES DE REDE E GPS -->
+    <!-- 1. PERMISSÕES DE REDE E GPS (Mantidas) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     
-    <!-- 2. PERMISSÕES PARA NOTIFICAÇÕES (Android 13+) -->
+    <!-- ADICIONADO: Permissão para salvar arquivos em versões mais antigas do Android -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
+    <!-- 2. PERMISSÕES PARA NOTIFICAÇÕES (Mantidas) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     
-    <!-- 3. PERMISSÕES PARA LEMBRETES E ALARMES -->
+    <!-- 3. PERMISSÕES PARA LEMBRETES E ALARMES (Mantidas) -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
@@ -19,7 +22,7 @@
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
 
-        <!-- 4. SERVIÇO DO FIREBASE MESSAGING -->
+        <!-- 4. SERVIÇO DO FIREBASE MESSAGING (Mantido) -->
         <service
             android:name="com.google.firebase.messaging.FirebaseMessagingService"
             android:exported="false">
@@ -28,7 +31,7 @@
             </intent-filter>
         </service>
 
-        <!-- 5. RECEIVERS PARA AGENDAMENTO DE NOTIFICAÇÕES -->
+        <!-- 5. RECEIVERS PARA AGENDAMENTO DE NOTIFICAÇÕES (Mantidos) -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
             <intent-filter>
@@ -73,6 +76,11 @@
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" />
+        </intent>
+        <!-- ADICIONADO: Permite que o app compartilhe o CSV com apps de email/arquivos -->
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="text/csv" />
         </intent>
     </queries>
 </manifest>

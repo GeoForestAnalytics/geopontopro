@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:signature/signature.dart';
 import '../models/user_model.dart';
 import '../services/ponto_service.dart';

@@ -36,7 +36,7 @@ class PontoModel {
   final String id;
   final String usuarioId;
   final String usuarioNome;
-  final String empresaId; // <--- PADRONIZADO PARA empresaId
+  final String empresaId; // <--- PADRONIZADO
   final TipoBatida tipo;
   final DateTime timestamp;
   final double latitude;
@@ -99,6 +99,7 @@ class FechamentoMensal {
   final String? assinaturaBase64;
   final DateTime? assinadoEm;
   final bool fechado;
+  final String empresaId; // <--- ADICIONADO
 
   FechamentoMensal({
     required this.id,
@@ -106,6 +107,7 @@ class FechamentoMensal {
     required this.usuarioNome,
     required this.mes,
     required this.ano,
+    required this.empresaId,
     this.assinaturaBase64,
     this.assinadoEm,
     required this.fechado,
@@ -119,6 +121,7 @@ class FechamentoMensal {
       usuarioNome: d['usuarioNome'] ?? '',
       mes: d['mes'] ?? 1,
       ano: d['ano'] ?? 2024,
+      empresaId: d['empresaId'] ?? '',
       assinaturaBase64: d['assinaturaBase64'],
       assinadoEm: (d['assinadoEm'] as Timestamp?)?.toDate(),
       fechado: d['fechado'] ?? false,
@@ -130,6 +133,7 @@ class FechamentoMensal {
     'usuarioNome': usuarioNome,
     'mes': mes,
     'ano': ano,
+    'empresaId': empresaId,
     'assinaturaBase64': assinaturaBase64,
     'assinadoEm': assinadoEm != null ? Timestamp.fromDate(assinadoEm!) : null,
     'fechado': fechado,

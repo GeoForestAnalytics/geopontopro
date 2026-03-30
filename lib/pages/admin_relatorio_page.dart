@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/ponto_service.dart';
+import '../services/export_service.dart'; // <--- IMPORTADO
 import 'historico_page.dart';
 import 'mapa_pontos_page.dart';
 import 'banco_horas_page.dart';
@@ -13,14 +14,12 @@ class AdminRelatorioPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Obtém os dados do administrador logado
     final admin = ref.watch(userProfileProvider).value;
     if (admin == null) return const Center(child: CircularProgressIndicator());
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StreamBuilder<List<Map<String, dynamic>>>(
-        // CORREÇÃO: Agora passa o 'empresaId' para filtrar apenas colaboradores da mesma empresa
         stream: ref.watch(pontoServiceProvider).streamTodosUsuarios(admin.empresaId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -28,7 +27,6 @@ class AdminRelatorioPage extends ConsumerWidget {
           }
           
           final lista = snapshot.data ?? [];
-          // Filtra para não mostrar o próprio admin na lista de relatórios
           final colaboradores = lista.where((u) => u['uid'] != admin.uid).toList();
 
           if (colaboradores.isEmpty) {
@@ -65,14 +63,13 @@ class AdminRelatorioPage extends ConsumerWidget {
   }
 
   void _abrirOpcoes(BuildContext context, Map<String, dynamic> u) {
-    // CORREÇÃO: Instanciando o UserModel com os novos campos empresaId e empresaNome
     final user = UserModel(
       uid: u['uid'], 
       nome: u['nome'] ?? '', 
       email: u['email'] ?? '', 
       cargo: u['cargo'] ?? '', 
-      empresaId: u['empresaId'] ?? '',     // <--- NOVO
-      empresaNome: u['empresaNome'] ?? '', // <--- NOVO
+      empresaId: u['empresaId'] ?? '',
+      empresaNome: u['empresaNome'] ?? '',
       isAdmin: u['isAdmin'] ?? false, 
       criadoEm: DateTime.now(),
     );
@@ -97,6 +94,31 @@ class AdminRelatorioPage extends ConsumerWidget {
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
             ),
             const SizedBox(height: 10),
+
+            // 1. NOVA OPÇÃO: EXPORTAR PLANILHA
+            _itemMenu(
+              context,
+              label: 'Exportar Planilha (Excel/CSV)',
+              icon: Icons.table_chart,
+              cor: Colors.green,
+              onTap: () async {
+                // Feedback visual de carregamento
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Gerando planilha... aguarde.')),
+                );
+
+                final service = PontoService();
+                final pontos = await service.obterPontosMes(
+                  user.uid, 
+                  DateTime.now().month, 
+                  DateTime.now().year
+                );
+                
+                await ExportService().exportarPontosCSV(user, pontos);
+              },
+            ),
+
+            // 2. OPÇÃO EXISTENTE: HISTÓRICO
             _itemMenu(
               context,
               label: 'Espelho de Ponto (Lista)',
@@ -104,6 +126,8 @@ class AdminRelatorioPage extends ConsumerWidget {
               cor: Colors.blue,
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistoricoPage(user: user))),
             ),
+
+            // 3. OPÇÃO EXISTENTE: MAPA
             _itemMenu(
               context,
               label: 'Mapa de Trajeto GPS',
@@ -111,6 +135,8 @@ class AdminRelatorioPage extends ConsumerWidget {
               cor: Colors.orange,
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MapaPontosPage(user: user))),
             ),
+
+            // 4. OPÇÃO EXISTENTE: BANCO DE HORAS
             _itemMenu(
               context,
               label: 'Cálculo de Banco de Horas',
@@ -118,6 +144,8 @@ class AdminRelatorioPage extends ConsumerWidget {
               cor: Colors.teal,
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BancoHorasPage(user: user))),
             ),
+
+            // 5. OPÇÃO EXISTENTE: PDF
             _itemMenu(
               context,
               label: 'Gerar Documento PDF',
@@ -143,8 +171,8 @@ class AdminRelatorioPage extends ConsumerWidget {
       title: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
       trailing: const Icon(Icons.chevron_right, size: 18),
       onTap: () {
-        Navigator.pop(context); // Fecha o menu lateral/inferior
-        onTap(); // Abre a página escolhida
+        Navigator.pop(context); // Fecha o modal
+        onTap(); // Executa a ação
       },
     );
   }

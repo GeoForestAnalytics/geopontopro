@@ -47,6 +47,8 @@ dependencies:
   uuid: ^4.4.0                      # Gerador de IDs únicos
   permission_handler: ^11.3.1       # Controle de permissões de GPS/Notif
   device_info_plus: ^10.1.0         # Identificação do aparelho
+  csv: ^6.0.0            # Para transformar listas em formato CSV
+  share_plus: ^7.2.2     # Para abrir a janela de compartilhamento (e-mail, WhatsApp, etc)
 
 dev_dependencies:
   flutter_test:
